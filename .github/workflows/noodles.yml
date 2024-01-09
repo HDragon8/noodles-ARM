@@ -50,7 +50,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE
         chmod +x .github/diy/${{matrix.target}}.sh
-        git clone -b ${{matrix.target}} https://github.com/HDragon8/imwrt-packages.git ${{matrix.target}}
+        git clone -b ${{matrix.target}} https://github.com/HDragon8/noodles-ARM.git ${{matrix.target}}
         cd ${{matrix.target}}
         git rm -r --cache * >/dev/null 2>&1 &
         rm -rf `find ./* -maxdepth 0 -type d ! -name "diy"` >/dev/null 2>&1
@@ -74,7 +74,7 @@ jobs:
         if git status --porcelain | grep .; then
           git add .
           git commit -am "${Emoji[$[$RANDOM % ${#Emoji[@]}]]} update $(date +%Y-%m-%d" "%H:%M:%S) ${Emoji[$[$RANDOM % ${#Emoji[@]}]]}"
-          git push --quiet "https://${{ secrets.noodles1_TOKEN }}@github.com/HDragon8/imwrt-packages.git" HEAD:${{matrix.target}}
+          git push --quiet "https://${{ secrets.noodles1_TOKEN }}@github.com/HDragon8/noodles-ARM.git" HEAD:${{matrix.target}}
         else
           echo "nothing to commit"
           exit 0
