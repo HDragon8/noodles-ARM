@@ -1,6 +1,6 @@
 log:
   level: info
-  file: "/var/log/mosdns.log"
+  file: "/tmp/mosdns.log"
 
 # API 入口设置
 api:
