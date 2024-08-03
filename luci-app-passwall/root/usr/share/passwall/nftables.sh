@@ -878,7 +878,8 @@ add_firewall_rule() {
 	[ "${USE_BLOCK_LIST}" = "1" ] && nft "add rule inet fw4 PSW_OUTPUT_MANGLE ip daddr @$NFTSET_BLOCKLIST counter drop"
 
 	# jump chains
-	nft "add rule inet fw4 mangle_prerouting meta nfproto {ipv4} counter jump PSW_MANGLE"
+	nft "add rule inet fw4 mangle_prerouting ip protocol udp counter jump PSW_MANGLE"
+	[ -n "${is_tproxy}" ] && nft "add rule inet fw4 mangle_prerouting ip protocol tcp counter jump PSW_MANGLE"
 	insert_rule_before "inet fw4" "mangle_prerouting" "PSW_MANGLE" "counter jump PSW_DIVERT"
 
 	#ipv4 tcp redirect mode
@@ -916,7 +917,8 @@ add_firewall_rule() {
 
 	WAN_IP=$(get_wan_ip)
 	if [ -n "${WAN_IP}" ]; then
-		[ -n "${is_tproxy}" ] && nft "add rule inet fw4 PSW_MANGLE ip daddr ${WAN_IP} counter return comment \"WAN_IP_RETURN\"" || nft "add rule inet fw4 PSW_NAT ip daddr ${WAN_IP} counter return comment \"WAN_IP_RETURN\""
+		nft "add rule inet fw4 PSW_MANGLE ip daddr ${WAN_IP} counter return comment \"WAN_IP_RETURN\""
+		[ -z "${is_tproxy}" ] && nft "add rule inet fw4 PSW_NAT ip daddr ${WAN_IP} counter return comment \"WAN_IP_RETURN\""
 	fi
 	unset WAN_IP
 
@@ -1153,14 +1155,17 @@ add_firewall_rule() {
 		nft "add rule inet fw4 mangle_output meta mark 1 counter return comment \"PSW_OUTPUT_MANGLE\""
 
 		[ $(config_t_get global dns_redirect "0") = "1" ] && {
-			nft "add rule inet fw4 PSW_MANGLE ip protocol udp udp dport 53 counter return"	
+			nft "add rule inet fw4 PSW_MANGLE ip protocol udp udp dport 53 counter return"
+			nft "add rule inet fw4 PSW_MANGLE ip protocol tcp tcp dport 53 counter return"
 			nft "add rule inet fw4 PSW_MANGLE_V6 meta l4proto udp udp dport 53 counter return"
+			nft "add rule inet fw4 PSW_MANGLE_V6 meta l4proto tcp tcp dport 53 counter return"
 			nft insert rule inet fw4 dstnat position 0 tcp dport 53 counter redirect to :53 comment \"PSW_DNS_Hijack\" 2>/dev/null
 			nft insert rule inet fw4 dstnat position 0 udp dport 53 counter redirect to :53 comment \"PSW_DNS_Hijack\" 2>/dev/null
 			nft insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} tcp dport 53 counter redirect to :53 comment \"PSW_DNS_Hijack\" 2>/dev/null
 			nft insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} udp dport 53 counter redirect to :53 comment \"PSW_DNS_Hijack\" 2>/dev/null
 			uci -q set dhcp.@dnsmasq[0].dns_redirect='0' 2>/dev/null
 			uci commit dhcp 2>/dev/null
+			echolog "  - 开启 DNS 重定向"
 		}
 	}
 
@@ -1247,10 +1252,11 @@ flush_include() {
 }
 
 gen_include() {
+	flush_include
 	local nft_chain_file=$TMP_PATH/PSW_RULE.nft
 	local nft_set_file=$TMP_PATH/PSW_SETS.nft
-	echo "#!/usr/sbin/nft -f" > $nft_chain_file
-	echo "#!/usr/sbin/nft -f" > $nft_set_file
+	echo '#!/usr/sbin/nft -f' > $nft_chain_file
+	echo '#!/usr/sbin/nft -f' > $nft_set_file
 	for chain in $(nft -a list chains | grep -E "chain PSW_" | awk -F ' ' '{print$2}'); do
 		nft list chain inet fw4 ${chain} >> $nft_chain_file
 	done
@@ -1283,13 +1289,15 @@ gen_include() {
 			nft "add rule inet fw4 nat_output ip protocol tcp counter jump PSW_OUTPUT_NAT"
 		}
 
+		PR_INDEX=\$(sh ${MY_PATH} RULE_LAST_INDEX "inet fw4" PSW_MANGLE WAN_IP_RETURN -1)
+		if [ \$PR_INDEX -ge 0 ]; then
+			WAN_IP=\$(sh ${MY_PATH} get_wan_ip)
+			[ ! -z "\${WAN_IP}" ] && nft "replace rule inet fw4 PSW_MANGLE handle \$PR_INDEX ip daddr "\${WAN_IP}" counter return comment \"WAN_IP_RETURN\""
+		fi
+		nft "add rule inet fw4 mangle_prerouting ip protocol udp counter jump PSW_MANGLE"
+
 		[ -n "${is_tproxy}" ] && {
-			PR_INDEX=\$(sh ${MY_PATH} RULE_LAST_INDEX "inet fw4" PSW_MANGLE WAN_IP_RETURN -1)
-			if [ \$PR_INDEX -ge 0 ]; then
-				WAN_IP=\$(sh ${MY_PATH} get_wan_ip)
-				[ ! -z "\${WAN_IP}" ] && nft "replace rule inet fw4 PSW_MANGLE handle \$PR_INDEX ip daddr "\${WAN_IP}" counter return comment \"WAN_IP_RETURN\""
-			fi
-			nft "add rule inet fw4 mangle_prerouting meta nfproto {ipv4} counter jump PSW_MANGLE"
+			nft "add rule inet fw4 mangle_prerouting ip protocol tcp counter jump PSW_MANGLE"
 			nft "add rule inet fw4 mangle_output ip protocol tcp counter jump PSW_OUTPUT_MANGLE comment \"PSW_OUTPUT_MANGLE\""
 		}
 		\$(sh ${MY_PATH} insert_rule_before "inet fw4" "mangle_prerouting" "PSW_MANGLE" "counter jump PSW_DIVERT")
