@@ -658,8 +658,11 @@ run_chinadns_ng() {
 	([ -z "${_default_tag}" ] || [ "${_default_tag}" = "smart" ] || [ "${_default_tag}" = "none_noip" ]) && _default_tag="none"
 	echo "default-tag ${_default_tag}" >> ${_CONF_FILE}
 
+	echo "cache 4096" >> ${_CONF_FILE}
+	echo "cache-stale 3600" >> ${_CONF_FILE}
+
 	[ "${_flag}" = "default" ] && [ "${_default_tag}" = "none" ] && {
-		echo "verdict-cache 4096" >> ${_CONF_FILE}
+		echo "verdict-cache 5000" >> ${_CONF_FILE}
 	}
 
 	ln_run "$(first_type chinadns-ng)" chinadns-ng "${_LOG_FILE}" -C ${_CONF_FILE}
@@ -1379,7 +1382,6 @@ start_dns() {
 			LOCAL_DNS=$(config_t_get global direct_dns_udp 223.5.5.5 | sed 's/:/#/g')
 			china_ng_local_dns=${LOCAL_DNS}
 			sing_box_local_dns="direct_dns_udp_server=${LOCAL_DNS}"
-			IPT_APPEND_DNS=${LOCAL_DNS}
 		;;
 		tcp)
 			LOCAL_DNS="127.0.0.1#${dns_listen_port}"
@@ -1387,7 +1389,6 @@ start_dns() {
 			local DIRECT_DNS=$(config_t_get global direct_dns_tcp 223.5.5.5 | sed 's/:/#/g')
 			china_ng_local_dns="tcp://${DIRECT_DNS}"
 			sing_box_local_dns="direct_dns_tcp_server=${DIRECT_DNS}"
-			IPT_APPEND_DNS="${LOCAL_DNS},${DIRECT_DNS}"
 			ln_run "$(first_type dns2tcp)" dns2tcp "/dev/null" -L "${LOCAL_DNS}" -R "$(get_first_dns DIRECT_DNS 53)" -v
 			echolog "  - dns2tcp(${LOCAL_DNS}) -> tcp://$(get_first_dns DIRECT_DNS 53 | sed 's/#/:/g')"
 			echolog "  * 请确保上游直连 DNS 支持 TCP 查询。"
@@ -1405,8 +1406,8 @@ start_dns() {
 
 				local tmp_dot_ip=$(echo "$DIRECT_DNS" | sed -n 's/.*:\/\/\([^@#]*@\)*\([^@#]*\).*/\2/p')
 				local tmp_dot_port=$(echo "$DIRECT_DNS" | sed -n 's/.*#\([0-9]\+\).*/\1/p')
-				sing_box_local_dns="direct_dns_dot_server=$tmp_dot_ip#${tmp_dot_port:-853}"
-				IPT_APPEND_DNS="${LOCAL_DNS},$tmp_dot_ip#${tmp_dot_port:-853}"
+				DIRECT_DNS=$tmp_dot_ip#${tmp_dot_port:-853}
+				sing_box_local_dns="direct_dns_dot_server=${DIRECT_DNS}"
 			else
 				echolog "  - 你的ChinaDNS-NG版本不支持DoT，直连DNS将使用默认地址。"
 			fi
@@ -1416,6 +1417,21 @@ start_dns() {
 			:
 		;;
 	esac
+
+	# 追加直连DNS到iptables/nftables
+	[ "$(config_t_get global_haproxy balancing_enable 0)" != "1" ] && IPT_APPEND_DNS=
+	add_default_port() {
+		[ -z "$1" ] && echo "" || echo "$1" | awk -F',' '{for(i=1;i<=NF;i++){if($i !~ /#/) $i=$i"#53";} print $0;}' OFS=','
+	}
+	LOCAL_DNS=$(add_default_port "$LOCAL_DNS")
+	IPT_APPEND_DNS=$(add_default_port "${IPT_APPEND_DNS:-$LOCAL_DNS}")
+	echo "$IPT_APPEND_DNS" | grep -q -E "(^|,)$LOCAL_DNS(,|$)" || IPT_APPEND_DNS="${IPT_APPEND_DNS:+$IPT_APPEND_DNS,}$LOCAL_DNS"
+	[ -n "$DIRECT_DNS" ] && {
+		DIRECT_DNS=$(add_default_port "$DIRECT_DNS")
+		echo "$IPT_APPEND_DNS" | grep -q -E "(^|,)$DIRECT_DNS(,|$)" || IPT_APPEND_DNS="${IPT_APPEND_DNS:+$IPT_APPEND_DNS,}$DIRECT_DNS"
+	}
+	# 排除127.0.0.1的条目
+	IPT_APPEND_DNS=$(echo "$IPT_APPEND_DNS" | awk -F',' '{for(i=1;i<=NF;i++) if($i !~ /^127\.0\.0\.1/) printf (i>1?",":"") $i; print ""}' | sed 's/^,\|,$//g')
 
 	TUN_DNS="127.0.0.1#${dns_listen_port}"
 	[ "${resolve_dns}" == "1" ] && TUN_DNS="127.0.0.1#${resolve_dns_port}"
@@ -1619,6 +1635,7 @@ add_ip2route() {
 
 delete_ip2route() {
 	[ -d "${TMP_ROUTE_PATH}" ] && {
+		local interface
 		for interface in $(ls ${TMP_ROUTE_PATH}); do
 			for ip in $(cat ${TMP_ROUTE_PATH}/${interface}); do
 				route del -host ${ip} dev ${interface} >/dev/null 2>&1
@@ -1655,7 +1672,7 @@ acl_app() {
 			eval $(uci -q show "${CONFIG}.${item}" | cut -d'.' -sf 3-)
 			[ "$enabled" = "1" ] || continue
 
-			[ -z "${sources}" ] && continue
+			[ -z "${sources}" ] && [ -z "${interface}" ] && continue
 			for s in $sources; do
 				is_iprange=$(lua_api "iprange(\"${s}\")")
 				if [ "${is_iprange}" = "true" ]; then
@@ -1671,9 +1688,14 @@ acl_app() {
 					fi
 				fi
 			done
-			[ -z "${rule_list}" ] && continue
+			for i in $interface; do
+				interface_list="${interface_list}\n$i"
+			done
+			[ -z "${rule_list}" ] && [ -z "${interface_list}" ] && continue
 			mkdir -p $TMP_ACL_PATH/$sid
-			echo -e "${rule_list}" | sed '/^$/d' > $TMP_ACL_PATH/$sid/rule_list
+
+			[ ! -z "${rule_list}" ] && echo -e "${rule_list}" | sed '/^$/d' > $TMP_ACL_PATH/$sid/rule_list
+			[ ! -z "${interface_list}" ] && echo -e "${interface_list}" | sed '/^$/d' > $TMP_ACL_PATH/$sid/interface_list
 
 			use_global_config=${use_global_config:-0}
 			tcp_node=${tcp_node:-nil}
@@ -1901,8 +1923,8 @@ acl_app() {
 				udp_flag=1
 			}
 			[ -n "$redirect_dns_port" ] && echo "${redirect_dns_port}" > $TMP_ACL_PATH/$sid/var_redirect_dns_port
-			unset enabled sid remarks sources use_global_config tcp_node udp_node use_direct_list use_proxy_list use_block_list use_gfw_list chn_list tcp_proxy_mode udp_proxy_mode filter_proxy_ipv6 dns_mode remote_dns v2ray_dns_mode remote_dns_doh dns_client_ip
-			unset _ip _mac _iprange _ipset _ip_or_mac rule_list tcp_port udp_port config_file _extra_param
+			unset enabled sid remarks sources interface use_global_config tcp_node udp_node use_direct_list use_proxy_list use_block_list use_gfw_list chn_list tcp_proxy_mode udp_proxy_mode filter_proxy_ipv6 dns_mode remote_dns v2ray_dns_mode remote_dns_doh dns_client_ip
+			unset _ip _mac _iprange _ipset _ip_or_mac rule_list tcp_port udp_port config_file _extra_param interface_list
 			unset _china_ng_listen _chinadns_local_dns _direct_dns_mode chinadns_ng_default_tag dnsmasq_filter_proxy_ipv6
 			unset redirect_dns_port
 		done
