@@ -14,7 +14,8 @@ TMP_ACL_PATH=$TMP_PATH/acl
 TMP_IFACE_PATH=$TMP_PATH/iface
 TMP_PATH2=/tmp/etc/${CONFIG}_tmp
 DNSMASQ_PATH=/etc/dnsmasq.d
-TMP_DNSMASQ_PATH=/tmp/dnsmasq.d/passwall2
+DNSMASQ_CONF_DIR=/tmp/dnsmasq.d
+TMP_DNSMASQ_PATH=${DNSMASQ_CONF_DIR}/${CONFIG}
 LOG_FILE=/tmp/log/$CONFIG.log
 APP_PATH=/usr/share/$CONFIG
 RULES_PATH=/usr/share/${CONFIG}/rules
@@ -204,13 +205,16 @@ check_port_exists() {
 check_depends() {
 	local depends
 	local tables=${1}
+	local file_path="/usr/lib/opkg/info"
+	local file_ext=".control"
+	[ -d "/lib/apk/packages" ] && file_path="/lib/apk/packages" && file_ext=".list"
 	if [ "$tables" == "iptables" ]; then
 		for depends in "iptables-mod-tproxy" "iptables-mod-socket" "iptables-mod-iprange" "iptables-mod-conntrack-extra" "kmod-ipt-nat"; do
-			[ -s "/usr/lib/opkg/info/${depends}.control" ] || echolog "$tables透明代理基础依赖 $depends 未安装..."
+			[ -s "${file_path}/${depends}${file_ext}" ] || echolog "$tables透明代理基础依赖 $depends 未安装..."
 		done
 	else
 		for depends in "kmod-nft-socket" "kmod-nft-tproxy" "kmod-nft-nat"; do
-			[ -s "/usr/lib/opkg/info/${depends}.control" ] || echolog "$tables透明代理基础依赖 $depends 未安装..."
+			[ -s "${file_path}/${depends}${file_ext}" ] || echolog "$tables透明代理基础依赖 $depends 未安装..."
 		done
 	fi
 }
@@ -282,6 +286,17 @@ lua_api() {
 		return
 	}
 	echo $(lua -e "local api = require 'luci.passwall2.api' print(api.${func})")
+}
+
+get_dnsmasq_conf_dir() {
+	local dnsmasq_conf_path=$(grep -l "^conf-dir=" /tmp/etc/dnsmasq.conf.${DEFAULT_DNSMASQ_CFGID})
+	[ -n "$dnsmasq_conf_path" ] && {
+		local dnsmasq_conf_dir=$(grep '^conf-dir=' "$dnsmasq_conf_path" | cut -d'=' -f2 | head -n 1)
+		[ -n "$dnsmasq_conf_dir" ] && {
+			DNSMASQ_CONF_DIR=${dnsmasq_conf_dir%*/}
+			TMP_DNSMASQ_PATH=${DNSMASQ_CONF_DIR}/${CONFIG}
+		}
+	}
 }
 
 run_xray() {
@@ -688,7 +703,7 @@ run_global() {
 	echolog ${msg}
 
 	source $APP_PATH/helper_dnsmasq.sh stretch
-	source $APP_PATH/helper_dnsmasq.sh add TMP_DNSMASQ_PATH=$TMP_DNSMASQ_PATH DNSMASQ_CONF_FILE=/tmp/dnsmasq.d/dnsmasq-passwall2.conf DEFAULT_DNS=$AUTO_DNS LOCAL_DNS=$LOCAL_DNS TUN_DNS=$TUN_DNS NFTFLAG=${nftflag:-0}
+	source $APP_PATH/helper_dnsmasq.sh add TMP_DNSMASQ_PATH=$TMP_DNSMASQ_PATH DNSMASQ_CONF_FILE=${DNSMASQ_CONF_DIR}/dnsmasq-${CONFIG}.conf DEFAULT_DNS=$AUTO_DNS LOCAL_DNS=$LOCAL_DNS TUN_DNS=$TUN_DNS NFTFLAG=${nftflag:-0}
 
 	V2RAY_CONFIG=$TMP_ACL_PATH/default/global.json
 	V2RAY_LOG=$TMP_ACL_PATH/default/global.log
@@ -947,35 +962,33 @@ acl_app() {
 		for item in $items; do
 			index=$(expr $index + 1)
 			local enabled sid remarks sources node direct_dns_query_strategy remote_dns_protocol remote_dns remote_dns_doh remote_dns_client_ip remote_dns_detour remote_fakedns remote_dns_query_strategy interface use_interface
-			local _ip _mac _iprange _ipset _ip_or_mac rule_list interface_list config_file
+			local _ip _mac _iprange _ipset _ip_or_mac source_list config_file
 			sid=$(uci -q show "${CONFIG}.${item}" | grep "=acl_rule" | awk -F '=' '{print $1}' | awk -F '.' '{print $2}')
 			eval $(uci -q show "${CONFIG}.${item}" | cut -d'.' -sf 3-)
+
 			[ "$enabled" = "1" ] || continue
 
-			[ -z "${sources}" ] && [ -z "${interface}" ] && continue
 			for s in $sources; do
+				local s2
 				is_iprange=$(lua_api "iprange(\"${s}\")")
 				if [ "${is_iprange}" = "true" ]; then
-					rule_list="${rule_list}\niprange:${s}"
+					s2="iprange:${s}"
 				elif [ -n "$(echo ${s} | grep '^ipset:')" ]; then
-					rule_list="${rule_list}\nipset:${s}"
+					s2="ipset:${s}"
 				else
 					_ip_or_mac=$(lua_api "ip_or_mac(\"${s}\")")
 					if [ "${_ip_or_mac}" = "ip" ]; then
-						rule_list="${rule_list}\nip:${s}"
+						s2="ip:${s}"
 					elif [ "${_ip_or_mac}" = "mac" ]; then
-						rule_list="${rule_list}\nmac:${s}"
+						s2="mac:${s}"
 					fi
 				fi
+				[ -n "${s2}" ] && source_list="${source_list}\n${s2}"
+				unset s2
 			done
-			for i in $interface; do
-				interface_list="${interface_list}\n$i"
-			done
-			[ -z "${rule_list}" ] && [ -z "${interface_list}" ] && continue
+
 			mkdir -p $TMP_ACL_PATH/$sid
-			
-			[ ! -z "${rule_list}" ] && echo -e "${rule_list}" | sed '/^$/d' > $TMP_ACL_PATH/$sid/rule_list
-			[ ! -z "${interface_list}" ] && echo -e "${interface_list}" | sed '/^$/d' > $TMP_ACL_PATH/$sid/interface_list
+			[ ! -z "${source_list}" ] && echo -e "${source_list}" | sed '/^$/d' > $TMP_ACL_PATH/$sid/source_list
 
 			tcp_proxy_mode="global"
 			udp_proxy_mode="global"
@@ -1047,7 +1060,7 @@ acl_app() {
 			}
 			[ -n "$redirect_dns_port" ] && echo "${redirect_dns_port}" > $TMP_ACL_PATH/$sid/var_redirect_dns_port
 			unset enabled sid remarks sources interface node direct_dns_query_strategy remote_dns_protocol remote_dns remote_dns_doh remote_dns_client_ip remote_dns_detour remote_fakedns remote_dns_query_strategy 
-			unset _ip _mac _iprange _ipset _ip_or_mac rule_list config_file interface_list
+			unset _ip _mac _iprange _ipset _ip_or_mac source_list config_file
 			unset redirect_dns_port
 		done
 		unset redir_port dns_port dnsmasq_port
@@ -1177,6 +1190,8 @@ PROXY_IPV6=$(config_t_get global_forwarding ipv6_tproxy 0)
 
 XRAY_BIN=$(first_type $(config_t_get global_app xray_file) xray)
 SINGBOX_BIN=$(first_type $(config_t_get global_app singbox_file) sing-box)
+
+get_dnsmasq_conf_dir
 
 export V2RAY_LOCATION_ASSET=$(config_t_get global_rules v2ray_location_asset "/usr/share/v2ray/")
 export XRAY_LOCATION_ASSET=$V2RAY_LOCATION_ASSET
