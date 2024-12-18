@@ -223,8 +223,11 @@ msgstr "需要代理的分流规则域名使用 FakeDNS。"
 msgid "Redirect"
 msgstr "重定向"
 
-msgid "Force Router DNS server to all local devices."
-msgstr "强制所有本地设备使用路由器 DNS。"
+msgid "DNS Redirect"
+msgstr "DNS 重定向"
+
+msgid "Force special DNS server to need proxy devices."
+msgstr "强制需要代理的设备使用专用 DNS 服务器。"
 
 msgid "Clear IPSET"
 msgstr "清空 IPSET"
@@ -934,6 +937,9 @@ msgstr "开启 Geo 数据解析"
 msgid "Analyzes and preloads GeoIP/Geosite data to enhance the shunt performance of Sing-box/Xray."
 msgstr "分析和预加载 GeoIP/Geosite 数据，以增强 Sing-box/Xray 的分流效果。"
 
+msgid "Once enabled, the rule list can support GeoIP/Geosite rules."
+msgstr "启用后，规则列表可以支持 GeoIP/Geosite 规则。"
+
 msgid "Note: Increases resource usage; Geosite analysis is only supported in ChinaDNS-NG and SmartDNS modes."
 msgstr "注：会增加一些系统资源的开销，仅在 ChinaDNS-NG 和 SmartDNS 模式下支持分析 Geosite 。"
 
@@ -1642,6 +1648,9 @@ msgstr "握手服务器"
 msgid "Handshake Server Port"
 msgstr "握手服务器端口"
 
+msgid "Override the connection destination address with the sniffed domain.<br />Otherwise use sniffed domain for routing only.<br />If using shunt nodes, configure the domain shunt rules correctly."
+msgstr "用探测出的域名覆盖连接目标地址。<br />否则仅将探测得到的域名用于路由。<br />如使用分流节点，请正确设置域名分流规则。"
+
 msgid "Override the connection destination address with the sniffed domain.<br />When enabled, traffic will match only by domain, ignoring IP rules.<br />If using shunt nodes, configure the domain shunt rules correctly."
 msgstr "用探测出的域名覆盖连接目标地址。<br />启用后仅使用域名进行流量匹配，将忽略IP规则。<br />如使用分流节点，请正确设置域名分流规则。"
 
@@ -1711,7 +1720,10 @@ msgstr "延迟（ms）"
 msgid "If is domain name, The requested domain name will be resolved to IP before connect."
 msgstr "如果是域名，域名将在请求发出之前解析为 IP。"
 
-msgid "Landing node"
+msgid "Chain Proxy"
+msgstr "链式代理"
+
+msgid "Landing Node"
 msgstr "落地节点"
 
 msgid "Only support a layer of proxy."
@@ -1722,3 +1734,9 @@ msgstr "与使用 %s 节点时生效。"
 
 msgid "Set the default domain resolution strategy for the sing-box node."
 msgstr "为 sing-box 节点设置默认的域名解析策略。"
+
+msgid "Total Lines"
+msgstr "总行数："
+
+msgid "Read List"
+msgstr "读取列表"

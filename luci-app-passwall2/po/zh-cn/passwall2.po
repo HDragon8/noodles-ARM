@@ -172,6 +172,12 @@ msgstr "直连 DNS 解析结果写入到 IPSet"
 msgid "Perform the matching direct domain name rules into IP to IPSet/NFTSet, and then connect directly (not entering the core). Maybe conflict with some special circumstances."
 msgstr "将匹配到的直连规则的域名解析IP写入到 IPSet/NFTSet，然后直连（不进入内核）。可能和某些特殊情况冲突。"
 
+msgid "DNS Redirect"
+msgstr "DNS 重定向"
+
+msgid "Force special DNS server to need proxy devices."
+msgstr "强制需要代理的设备使用专用 DNS 服务器。"
+
 msgid "Clear IPSet"
 msgstr "清空 IPSet"
 
@@ -1486,6 +1492,9 @@ msgstr "Sing-Box 会在启动时自动下载资源文件，您可以使用此功
 msgid "Override the connection destination address"
 msgstr "覆盖连接目标地址"
 
+msgid "Override the connection destination address with the sniffed domain.<br />Otherwise use sniffed domain for routing only.<br />If using shunt nodes, configure the domain shunt rules correctly."
+msgstr "用探测出的域名覆盖连接目标地址。<br />否则仅将探测得到的域名用于路由。<br />如使用分流节点，请正确设置域名分流规则。"
+
 msgid "Override the connection destination address with the sniffed domain.<br />When enabled, traffic will match only by domain, ignoring IP rules.<br />If using shunt nodes, configure the domain shunt rules correctly."
 msgstr "用探测出的域名覆盖连接目标地址。<br />启用后仅使用域名进行流量匹配，将忽略IP规则。<br />如使用分流节点，请正确设置域名分流规则。"
 
@@ -1561,7 +1570,10 @@ msgstr "延迟（ms）"
 msgid "If is domain name, The requested domain name will be resolved to IP before connect."
 msgstr "如果是域名，域名将在请求发出之前解析为 IP。"
 
-msgid "Landing node"
+msgid "Chain Proxy"
+msgstr "链式代理"
+
+msgid "Landing Node"
 msgstr "落地节点"
 
 msgid "Only support a layer of proxy."
