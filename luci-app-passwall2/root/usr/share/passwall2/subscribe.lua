@@ -3,8 +3,6 @@
 ------------------------------------------------
 -- @author William Chan <root@williamchan.me>
 ------------------------------------------------
-require 'nixio'
-require 'luci.model.uci'
 require 'luci.util'
 require 'luci.jsonc'
 require 'luci.sys'
@@ -19,7 +17,8 @@ local ssub, slen, schar, sbyte, sformat, sgsub = string.sub, string.len, string.
 local split = api.split
 local jsonParse, jsonStringify = luci.jsonc.parse, luci.jsonc.stringify
 local base64Decode = api.base64Decode
-local uci = luci.model.uci.cursor()
+local uci = api.uci
+local fs = api.fs
 uci:revert(appname)
 
 local has_ss = api.is_finded("ss-redir")
@@ -248,7 +247,7 @@ do
 						currentNode = _node_id and uci:get_all(appname, _node_id) or nil,
 						remarks = "分流" .. e.remarks .. "节点",
 						set = function(o, server)
-							if not server then server = "nil" end
+							if not server then server = "" end
 							uci:set(appname, node_id, e[".name"], server)
 							o.newNodeId = server
 						end
@@ -452,7 +451,12 @@ local function processData(szType, content, add_mode, add_from)
 		elseif result.type == "Xray" and info.net == "tcp" then
 			info.net = "raw"
 		end
-		result.transport = info.net
+		if info.net == 'h2' or info.net == 'http' then
+			info.net = "http"
+			result.transport = (result.type == "Xray") and "xhttp" or "http"
+		else
+			result.transport = info.net
+		end
 		if info.net == 'ws' then
 			result.ws_host = info.host
 			result.ws_path = info.path
@@ -472,9 +476,15 @@ local function processData(szType, content, add_mode, add_from)
 				end
 			end
 		end
-		if info.net == 'h2' then
-			result.h2_host = info.host
-			result.h2_path = info.path
+		if info.net == "http" then
+			if result.type == "Xray" then
+				result.xhttp_mode = "stream-one"
+				result.xhttp_host = info.host
+				result.xhttp_path = info.path
+			else
+				result.http_host = info.host
+				result.http_path = info.path
+			end
 		end
 		if info.net == 'raw' or info.net == 'tcp' then
 			if info.type and info.type ~= "http" then
@@ -573,7 +583,7 @@ local function processData(szType, content, add_mode, add_from)
 			info = info:sub(1, find_index - 1)
 		end
 
-		local hostInfo = split(base64Decode(info), "@")
+		local hostInfo = split(base64Decode(UrlDecode(info)), "@")
 		if hostInfo and #hostInfo > 0 then
 			local host_port = hostInfo[#hostInfo]
 			-- [2001:4860:4860::8888]:443
@@ -619,12 +629,9 @@ local function processData(szType, content, add_mode, add_from)
 				result.protocol = 'shadowsocks'
 			end
 
-			if result.type == "SS-Rust" and method:lower() == "chacha20-poly1305" then
-				result.method = "chacha20-ietf-poly1305"
-			end
-
-			if result.type == "Xray" and method:lower() == "chacha20-ietf-poly1305" then
-				result.method = "chacha20-poly1305"
+			if result.type ~= "Xray" then
+				result.method = (method:lower() == "chacha20-poly1305" and "chacha20-ietf-poly1305") or
+						(method:lower() == "xchacha20-poly1305" and "xchacha20-ietf-poly1305") or method
 			end
 
 			if result.plugin then
@@ -658,7 +665,12 @@ local function processData(szType, content, add_mode, add_from)
 				elseif result.type == "Xray" and params.type == "tcp" then
 					params.type = "raw"
 				end
-				result.transport = params.type
+				if params.type == "h2" or params.type == "http" then
+					params.type = "http"
+					result.transport = (result.type == "Xray") and "xhttp" or "http"
+				else
+					result.transport = params.type
+				end
 				if result.type ~= "SS-Rust" and result.type ~= "SS" then
 					if params.type == 'ws' then
 						result.ws_host = params.host
@@ -679,15 +691,16 @@ local function processData(szType, content, add_mode, add_from)
 							end
 						end
 					end
-					if params.type == 'h2' or params.type == 'http' then
+					if params.type == "http" then
 						if result.type == "sing-box" then
 							result.transport = "http"
 							result.http_host = params.host
 							result.http_path = params.path
-						elseif result.type == "xray" then
-							result.transport = "h2"
-							result.h2_host = params.host
-							result.h2_path = params.path
+						elseif result.type == "Xray" then
+							result.transport = "xhttp"
+							result.xhttp_mode = "stream-one"
+							result.xhttp_host = params.host
+							result.xhttp_path = params.path
 						end
 					end
 					if params.type == 'raw' or params.type == 'tcp' then
@@ -809,7 +822,12 @@ local function processData(szType, content, add_mode, add_from)
 			elseif result.type == "Xray" and params.type == "tcp" then
 				params.type = "raw"
 			end
-			result.transport = params.type
+			if params.type == "h2" or params.type == "http" then
+				params.type = "http"
+				result.transport = (result.type == "Xray") and "xhttp" or "http"
+			else
+				result.transport = params.type
+			end
 			if params.type == 'ws' then
 				result.ws_host = params.host
 				result.ws_path = params.path
@@ -829,15 +847,16 @@ local function processData(szType, content, add_mode, add_from)
 					end
 				end
 			end
-			if params.type == 'h2' or params.type == 'http' then
+			if params.type == "http" then
 				if result.type == "sing-box" then
 					result.transport = "http"
 					result.http_host = params.host
 					result.http_path = params.path
-				elseif result.type == "xray" then
-					result.transport = "h2"
-					result.h2_host = params.host
-					result.h2_path = params.path
+				elseif result.type == "Xray" then
+					result.transport = "xhttp"
+					result.xhttp_mode = "stream-one"
+					result.xhttp_host = params.host
+					result.xhttp_path = params.path
 				end
 			end
 			if params.type == 'raw' or params.type == 'tcp' then
@@ -944,7 +963,12 @@ local function processData(szType, content, add_mode, add_from)
 			elseif result.type == "Xray" and params.type == "tcp" then
 				params.type = "raw"
 			end
-			result.transport = params.type
+			if params.type == "h2" or params.type == "http" then
+				params.type = "http"
+				result.transport = (result.type == "Xray") and "xhttp" or "http"
+			else
+				result.transport = params.type
+			end
 			if params.type == 'ws' then
 				result.ws_host = params.host
 				result.ws_path = params.path
@@ -964,15 +988,16 @@ local function processData(szType, content, add_mode, add_from)
 					end
 				end
 			end
-			if params.type == 'h2' or params.type == 'http' then
+			if params.type == "http" then
 				if result.type == "sing-box" then
 					result.transport = "http"
 					result.http_host = params.host
 					result.http_path = params.path
-				elseif result.type == "xray" then
-					result.transport = "h2"
-					result.h2_host = params.host
-					result.h2_path = params.path
+				elseif result.type == "Xray" then
+					result.transport = "xhttp"
+					result.xhttp_mode = "stream-one"
+					result.xhttp_host = params.host
+					result.xhttp_path = params.path
 				end
 			end
 			if params.type == 'raw' or params.type == 'tcp' then
@@ -1234,10 +1259,10 @@ local function truncate_nodes(add_from)
 			if config.currentNode and config.currentNode.add_mode == "2" then
 				if add_from then
 					if config.currentNode.add_from and config.currentNode.add_from == add_from then
-						config.set(config, "nil")
+						config.set(config, "")
 					end
 				else
-					config.set(config, "nil")
+					config.set(config, "")
 				end
 				if config.id then
 					uci:delete(appname, config.id)
@@ -1256,7 +1281,7 @@ local function truncate_nodes(add_from)
 			end
 		end
 	end)
-	uci:commit(appname)
+	api.uci_save(uci, appname, true)
 end
 
 local function select_node(nodes, config)
@@ -1371,7 +1396,7 @@ local function select_node(nodes, config)
 			config.set(config, server)
 		end
 	else
-		config.set(config, "nil")
+		config.set(config, "")
 	end
 end
 
@@ -1408,7 +1433,7 @@ local function update_node(manual)
 			end
 		end
 	end
-	uci:commit(appname)
+	api.uci_save(uci, appname, true)
 
 	if next(CONFIG) then
 		local nodes = {}
@@ -1443,11 +1468,11 @@ local function update_node(manual)
 		end
 		]]--
 
-		uci:commit(appname)
+		api.uci_save(uci, appname, true)
 	end
 
 	if arg[3] == "cron" then
-		if not nixio.fs.access("/var/lock/" .. appname .. ".lock") then
+		if not fs.access("/var/lock/" .. appname .. ".lock") then
 			luci.sys.call("touch /tmp/lock/" .. appname .. "_cron.lock")
 		end
 	end

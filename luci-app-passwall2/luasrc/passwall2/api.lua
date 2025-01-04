@@ -29,6 +29,55 @@ function log(...)
 	end
 end
 
+function is_old_uci()
+	return sys.call("grep 'require \"uci\"' /usr/lib/lua/luci/model/uci.lua >/dev/null 2>&1") == 0
+end
+
+function uci_save(cursor, config, commit, apply)
+	if is_old_uci() then
+		cursor:save(config)
+		if commit then
+			cursor:commit(config)
+			if apply then
+				sys.call("/etc/init.d/" .. config .. " reload > /dev/null 2>&1 &")
+			end
+		end
+	else
+		commit = true
+		if commit then
+			if apply then
+				cursor:commit(config)
+			else
+				sh_uci_commit(config)
+			end
+		end
+	end
+end
+
+function sh_uci_get(config, section, option)
+	exec_call(string.format("uci -q get %s.%s.%s", config, section, option))
+end
+
+function sh_uci_set(config, section, option, val, commit)
+	exec_call(string.format("uci -q set %s.%s.%s=\"%s\"", config, section, option, val))
+	if commit then sh_uci_commit(config) end
+end
+
+function sh_uci_del(config, section, option, commit)
+	exec_call(string.format("uci -q delete %s.%s.%s", config, section, option))
+	if commit then sh_uci_commit(config) end
+end
+
+function sh_uci_add_list(config, section, option, val, commit)
+	exec_call(string.format("uci -q del_list %s.%s.%s=\"%s\"", config, section, option, val))
+	exec_call(string.format("uci -q add_list %s.%s.%s=\"%s\"", config, section, option, val))
+	if commit then sh_uci_commit(config) end
+end
+
+function sh_uci_commit(config)
+	exec_call(string.format("uci -q commit %s", config))
+end
+
 function set_cache_var(key, val)
 	sys.call(string.format('/usr/share/passwall2/app.sh set_cache_var %s "%s"', key, val))
 end
@@ -207,6 +256,28 @@ function repeat_exist(table, value)
 	return false
 end
 
+function remove(...)
+	for index, value in ipairs({...}) do
+		if value and #value > 0 and value ~= "/" then
+			sys.call(string.format("rm -rf %s", value))
+		end
+	end
+end
+
+function is_install(package)
+	if package and #package > 0 then
+		local file_path = "/usr/lib/opkg/info"
+		local file_ext = ".control"
+		local has = sys.call("[ -d " .. file_path .. " ]")
+		if has ~= 0 then
+			file_path = "/lib/apk/packages"
+			file_ext = ".list"
+		end
+		return sys.call(string.format('[ -s "%s/%s%s" ]', file_path, package, file_ext)) == 0
+	end
+	return false
+end
+
 function get_args(arg)
 	local var = {}
 	for i, arg_k in pairs(arg) do
@@ -345,6 +416,26 @@ function get_domain_from_url(url)
 		return domain
 	end
 	return url
+end
+
+function get_node_name(node_id)
+	local e
+	if type(node_id) == "table" then
+		e = node_id
+	else
+		e = uci:get_all(appname, node_id)
+	end
+	if e then
+		if e.type and e.remarks then
+			if e.protocol and (e.protocol == "_balancing" or e.protocol == "_shunt" or e.protocol == "_iface") then
+				local type = e.type
+				if type == "sing-box" then type = "Sing-Box" end
+				local remark = "%s：[%s] " % {type .. " " .. i18n.translatef(e.protocol), e.remarks}
+				return remark
+			end
+		end
+	end
+	return ""
 end
 
 function get_valid_nodes()
@@ -1023,7 +1114,7 @@ end
 function get_version()
 	local version = sys.exec("opkg list-installed luci-app-passwall2 2>/dev/null | awk '{print $3}'")
 	if not version or #version == 0 then
-		version = sys.exec("apk info luci-app-passwall2 2>/dev/null | awk 'NR == 1 {print $1}' | cut -d'-' -f4-")
+		version = sys.exec("apk info -L luci-app-passwall2 2>/dev/null | awk 'NR == 1 {print $1}' | cut -d'-' -f4-")
 	end
 	return version or ""
 end

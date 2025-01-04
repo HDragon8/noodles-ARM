@@ -21,7 +21,7 @@ end
 
 function gen_outbound(flag, node, tag, proxy_table)
 	local result = nil
-	if node and node ~= "nil" then
+	if node then
 		local node_id = node[".name"]
 		if tag == nil then
 			tag = node_id
@@ -47,7 +47,7 @@ function gen_outbound(flag, node, tag, proxy_table)
 					"127.0.0.1", --bind
 					new_port, --socks port
 					config_file, --config file
-					(proxy_tag and proxy_tag ~= "nil" and relay_port) and tostring(relay_port) or "" --relay port
+					(proxy_tag and relay_port) and tostring(relay_port) or "" --relay port
 					)
 				)
 			)
@@ -57,7 +57,7 @@ function gen_outbound(flag, node, tag, proxy_table)
 				port = new_port
 			}
 		else
-			if proxy_tag and proxy_tag ~= "nil" then
+			if proxy_tag then
 				node.detour = proxy_tag
 			end
 		end
@@ -676,7 +676,7 @@ function gen_config_server(node)
 		}
 	}
 
-	if node.outbound_node and node.outbound_node ~= "nil" then
+	if node.outbound_node then
 		local outbound = nil
 		if node.outbound_node == "_iface" and node.outbound_node_iface then
 			outbound = {
@@ -764,6 +764,7 @@ function gen_config(var)
 	local remote_dns_detour = var["-remote_dns_detour"]
 	local remote_dns_query_strategy = var["-remote_dns_query_strategy"]
 	local remote_dns_fake = var["-remote_dns_fake"]
+	local remote_dns_client_ip = var["-remote_dns_client_ip"]
 	local dns_cache = var["-dns_cache"]
 	local tags = var["-tags"]
 
@@ -896,7 +897,7 @@ function gen_config(var)
 			end
 
 			if node.chain_proxy == "1" and node.preproxy_node then
-				if outbound["_flag_proxy_tag"] and outbound["_flag_proxy_tag"] ~= "nil" then
+				if outbound["_flag_proxy_tag"] then
 					--Ignore
 				else
 					local preproxy_node = uci:get_all(appname, node.preproxy_node)
@@ -942,7 +943,7 @@ function gen_config(var)
 
 			local function gen_shunt_node(rule_name, _node_id)
 				if not rule_name then return nil end
-				if not _node_id then _node_id = node[rule_name] or "nil" end
+				if not _node_id then _node_id = node[rule_name] end
 				local rule_outboundTag
 				if _node_id == "_direct" then
 					rule_outboundTag = "direct"
@@ -950,7 +951,7 @@ function gen_config(var)
 					rule_outboundTag = "block"
 				elseif _node_id == "_default" and rule_name ~= "default" then
 					rule_outboundTag = "default"
-				elseif _node_id:find("Socks_") then
+				elseif _node_id and _node_id:find("Socks_") then
 					local socks_id = _node_id:sub(1 + #"Socks_")
 					local socks_node = uci:get_all(appname, socks_id) or nil
 					if socks_node then
@@ -967,7 +968,7 @@ function gen_config(var)
 							rule_outboundTag = _outbound.tag
 						end
 					end
-				elseif _node_id ~= "nil" then
+				elseif _node_id then
 					local _node = uci:get_all(appname, _node_id)
 					if not _node then return nil end
 
@@ -1169,7 +1170,7 @@ function gen_config(var)
 						rule.domain_regex = #domain_table.domain_regex > 0 and domain_table.domain_regex or nil
 						rule.geosite = #domain_table.geosite > 0 and domain_table.geosite or nil
 
-						if outboundTag and outboundTag ~= "nil" then
+						if outboundTag then
 							table.insert(dns_domain_rules, api.clone(domain_table))
 						end
 					end
@@ -1255,6 +1256,7 @@ function gen_config(var)
 			strategy = remote_strategy,
 			address_resolver = "direct",
 			detour = COMMON.default_outbound_tag,
+			client_subnet = (remote_dns_client_ip and remote_dns_client_ip ~= "") and remote_dns_client_ip or nil,
 		}
 
 		if remote_dns_detour == "direct" then
@@ -1376,6 +1378,7 @@ function gen_config(var)
 							}
 							fakedns_dns_rule.server = fakedns_tag
 							fakedns_dns_rule.disable_cache = true
+							fakedns_dns_rule.client_subnet = nil
 							table.insert(dns.rules, fakedns_dns_rule)
 						end
 					end
@@ -1468,7 +1471,7 @@ function gen_config(var)
 			tag = "block"
 		})
 		for index, value in ipairs(config.outbounds) do
-			if (not value["_flag_proxy_tag"] or value["_flag_proxy_tag"] == "nil") and not value.detour and value["_id"] and value.server and value.server_port then
+			if not value["_flag_proxy_tag"] and not value.detour and value["_id"] and value.server and value.server_port then
 				sys.call(string.format("echo '%s' >> %s", value["_id"], api.TMP_PATH .. "/direct_node_list"))
 			end
 			for k, v in pairs(config.outbounds[index]) do
@@ -1581,6 +1584,7 @@ function gen_dns_config(var)
 	local remote_dns_doh_ip = var["-remote_dns_doh_ip"]
 	local remote_dns_doh_port = var["-remote_dns_doh_port"]
 	local remote_dns_detour = var["-remote_dns_detour"]
+	local remote_dns_client_ip = var["-remote_dns_client_ip"]
 	local remote_dns_outbound_socks_address = var["-remote_dns_outbound_socks_address"]
 	local remote_dns_outbound_socks_port = var["-remote_dns_outbound_socks_port"]
 	local dns_cache = var["-dns_cache"]
@@ -1667,6 +1671,7 @@ function gen_dns_config(var)
 				address_strategy = "prefer_ipv6",
 				strategy = (dns_query_strategy and dns_query_strategy ~= "UseIP") and "ipv4_only" or "prefer_ipv6",
 				detour = out_tag,
+				client_subnet = (remote_dns_client_ip and remote_dns_client_ip ~= "") and remote_dns_client_ip or nil,
 			}
 	
 			if direct_dns_udp_server then

@@ -2,13 +2,13 @@
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 MY_PATH=$DIR/iptables.sh
-IPSET_LOCALLIST="passwall2_locallist"
-IPSET_LANLIST="passwall2_lanlist"
-IPSET_VPSLIST="passwall2_vpslist"
+IPSET_LOCAL="passwall2_local"
+IPSET_LAN="passwall2_lan"
+IPSET_VPS="passwall2_vps"
 
-IPSET_LOCALLIST6="passwall2_locallist6"
-IPSET_LANLIST6="passwall2_lanlist6"
-IPSET_VPSLIST6="passwall2_vpslist6"
+IPSET_LOCAL6="passwall2_local6"
+IPSET_LAN6="passwall2_lan6"
+IPSET_VPS6="passwall2_vps6"
 
 FORCE_INDEX=2
 
@@ -204,47 +204,51 @@ gen_shunt_list() {
 	NODE_PROTOCOL=$(config_n_get $node protocol)
 	[ "$NODE_PROTOCOL" = "_shunt" ] && USE_SHUNT_NODE=1
 	[ "$USE_SHUNT_NODE" = "1" ] && {
-		local default_node=$(config_n_get ${node} default_node _direct)
-		local default_outbound="redirect"
-		[ "$default_node" = "_direct" ] && default_outbound="direct"
-		local shunt_ids=$(uci show $CONFIG | grep "=shunt_rules" | awk -F '.' '{print $2}' | awk -F '=' '{print $1}')
-		for shunt_id in $shunt_ids; do
-			local shunt_node=$(config_n_get ${node} "${shunt_id}" nil)
-			[ "$shunt_node" != "nil" ] && {
-				local ipset_v4="passwall2_${node}_${shunt_id}"
-				local ipset_v6="passwall2_${node}_${shunt_id}6"
-				ipset -! create $ipset_v4 nethash maxelem 1048576
-				ipset -! create $ipset_v6 nethash family inet6 maxelem 1048576
-				local outbound="redirect"
-				[ "$shunt_node" = "_direct" ] && outbound="direct"
-				[ "$shunt_node" = "_default" ] && outbound="${default_outbound}"
-				_SHUNT_LIST4="${_SHUNT_LIST4} ${ipset_v4}:${outbound}"
-				_SHUNT_LIST6="${_SHUNT_LIST6} ${ipset_v6}:${outbound}"
+		local enable_geoview=$(config_t_get global_rules enable_geoview 0)
+		[ -z "$(first_type geoview)" ] && enable_geoview=0
+		local preloading=0
+		preloading=$enable_geoview
+		[ "${preloading}" = "1" ] && {
+			local default_node=$(config_n_get ${node} default_node _direct)
+			local default_outbound="redirect"
+			[ "$default_node" = "_direct" ] && default_outbound="direct"
+			local shunt_ids=$(uci show $CONFIG | grep "=shunt_rules" | awk -F '.' '{print $2}' | awk -F '=' '{print $1}')
+			for shunt_id in $shunt_ids; do
+				local shunt_node=$(config_n_get ${node} "${shunt_id}")
+				[ -n "$shunt_node" ] && {
+					local ipset_v4="passwall2_${node}_${shunt_id}"
+					local ipset_v6="passwall2_${node}_${shunt_id}6"
+					ipset -! create $ipset_v4 nethash maxelem 1048576
+					ipset -! create $ipset_v6 nethash family inet6 maxelem 1048576
+					local outbound="redirect"
+					[ "$shunt_node" = "_direct" ] && outbound="direct"
+					[ "$shunt_node" = "_default" ] && outbound="${default_outbound}"
+					_SHUNT_LIST4="${_SHUNT_LIST4} ${ipset_v4}:${outbound}"
+					_SHUNT_LIST6="${_SHUNT_LIST6} ${ipset_v6}:${outbound}"
 
-				config_n_get $shunt_id ip_list | tr -s "\r\n" "\n" | sed -e "/^$/d" | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | sed -e "s/^/add $ipset_v4 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
-				config_n_get $shunt_id ip_list | tr -s "\r\n" "\n" | sed -e "/^$/d" | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | sed -e "s/^/add $ipset_v6 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
-				[ "$(config_t_get global_rules enable_geoview)" = "1" ] && {
-					local _geoip_code=$(config_n_get $shunt_id ip_list | tr -s "\r\n" "\n" | sed -e "/^$/d" | grep -E "^geoip:" | grep -v "^geoip:private" | sed -E 's/^geoip:(.*)/\1/' | sed ':a;N;$!ba;s/\n/,/g')
-					[ -n "$_geoip_code" ] && {
-						if [ "$(config_n_get $node type)" = "sing-box" ]; then
-							get_singbox_geoip $_geoip_code ipv4 | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | sed -e "s/^/add $ipset_v4 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
-							get_singbox_geoip $_geoip_code ipv6 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | sed -e "s/^/add $ipset_v6 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
-						else
-							if type geoview &> /dev/null; then
+					config_n_get $shunt_id ip_list | tr -s "\r\n" "\n" | sed -e "/^$/d" | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | sed -e "s/^/add $ipset_v4 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
+					config_n_get $shunt_id ip_list | tr -s "\r\n" "\n" | sed -e "/^$/d" | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | sed -e "s/^/add $ipset_v6 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
+					[ "${enable_geoview}" = "1" ] && {
+						local _geoip_code=$(config_n_get $shunt_id ip_list | tr -s "\r\n" "\n" | sed -e "/^$/d" | grep -E "^geoip:" | grep -v "^geoip:private" | sed -E 's/^geoip:(.*)/\1/' | sed ':a;N;$!ba;s/\n/,/g')
+						[ -n "$_geoip_code" ] && {
+							if [ "$(config_n_get $node type)" = "sing-box" ]; then
+								get_singbox_geoip $_geoip_code ipv4 | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | sed -e "s/^/add $ipset_v4 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
+								get_singbox_geoip $_geoip_code ipv6 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | sed -e "s/^/add $ipset_v6 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
+							else
 								get_geoip $_geoip_code ipv4 | grep -E "(\.((2(5[0-5]|[0-4][0-9]))|[0-1]?[0-9]{1,2})){3}" | sed -e "s/^/add $ipset_v4 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
 								get_geoip $_geoip_code ipv6 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | sed -e "s/^/add $ipset_v6 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
 							fi
-						fi
-						echolog "  - [$?]解析分流规则[$shunt_id]-[geoip:${_geoip_code}]加入到 IPSET 完成"
+							echolog "  - [$?]解析分流规则[$shunt_id]-[geoip:${_geoip_code}]加入到 IPSET 完成"
+						}
 					}
 				}
-			}
-		done
+			done
+		}
 		[ "${_write_ipset_direct}" = "1" ] && {
 			_SHUNT_LIST4="${_SHUNT_LIST4} ${_set_name4}:direct"
 			_SHUNT_LIST6="${_SHUNT_LIST6} ${_set_name6}:direct"
 		}
-		[ "$default_node" != "nil" ] && {
+		[ "${preloading}" = "1" ] && [ -n "$default_node" ] && {
 			local ipset_v4="passwall2_${node}_default"
 			local ipset_v6="passwall2_${node}_default6"
 			ipset -! create $ipset_v4 nethash maxelem 1048576
@@ -276,8 +280,8 @@ add_shunt_t_rule() {
 
 load_acl() {
 	[ "$ENABLED_ACLS" == 1 ] && {
-		acl_app
 		echolog "访问控制："
+		acl_app
 		for sid in $(ls -F ${TMP_ACL_PATH} | grep '/$' | awk -F '/' '{print $1}' | grep -v 'default'); do
 			eval $(uci -q show "${CONFIG}.${sid}" | cut -d'.' -sf 3-)
 
@@ -285,32 +289,34 @@ load_acl() {
 			udp_no_redir_ports=${udp_no_redir_ports:-default}
 			tcp_proxy_mode="global"
 			udp_proxy_mode="global"
+			tcp_redir_ports=${tcp_redir_ports:-default}
+			udp_redir_ports=${udp_redir_ports:-default}
 			node=${node:-default}
 			[ "$tcp_no_redir_ports" = "default" ] && tcp_no_redir_ports=$TCP_NO_REDIR_PORTS
 			[ "$udp_no_redir_ports" = "default" ] && udp_no_redir_ports=$UDP_NO_REDIR_PORTS
 			[ "$tcp_redir_ports" = "default" ] && tcp_redir_ports=$TCP_REDIR_PORTS
 			[ "$udp_redir_ports" = "default" ] && udp_redir_ports=$UDP_REDIR_PORTS
 
-			node_remark=$(config_n_get $NODE remarks)
 			[ -n "$(get_cache_var "ACL_${sid}_node")" ] && node=$(get_cache_var "ACL_${sid}_node")
 			[ -n "$(get_cache_var "ACL_${sid}_redir_port")" ] && redir_port=$(get_cache_var "ACL_${sid}_redir_port")
 			[ -n "$(get_cache_var "ACL_${sid}_dns_port")" ] && dns_redirect_port=$(get_cache_var "ACL_${sid}_dns_port")
-			[ "$node" = "default" ] && dns_redirect_port=${DNS_REDIRECT_PORT}
-			[ -n "$node" ] && [ "$node" != "default" ] && node_remark=$(config_n_get $node remarks)
+			[ -n "$node" ] && node_remark=$(config_n_get $node remarks)
 
 			write_ipset_direct=${write_ipset_direct:-1}
 			[ "${write_ipset_direct}" = "1" ] && {
-				if [ "$node" = "default" ]; then
-					local ipset_whitelist=${ipset_global_whitelist}
-					local ipset_whitelist6=${ipset_global_whitelist6}
+				if [ -n "$(get_cache_var "ACL_${sid}_default")" ]; then
+					local ipset_white=${ipset_global_white}
+					local ipset_white6=${ipset_global_white6}
+					shunt_list4=${SHUNT_LIST4}
+					shunt_list6=${SHUNT_LIST6}
 				else
-					local ipset_whitelist="passwall2_${sid}_whitelist"
-					local ipset_whitelist6="passwall2_${sid}_whitelist6"
-					ipset -! create $ipset_whitelist nethash maxelem 1048576
-					ipset -! create $ipset_whitelist6 nethash family inet6 maxelem 1048576
+					local ipset_white="passwall2_${sid}_white"
+					local ipset_white6="passwall2_${sid}_white6"
+					ipset -! create $ipset_white nethash maxelem 1048576
+					ipset -! create $ipset_white6 nethash family inet6 maxelem 1048576
 
 					#分流规则的IP列表(使用分流节点时导入)
-					gen_shunt_list ${node} shunt_list4 shunt_list6 ${write_ipset_direct} ${ipset_whitelist} ${ipset_whitelist6}
+					gen_shunt_list ${node} shunt_list4 shunt_list6 ${write_ipset_direct} ${ipset_white} ${ipset_white6}
 				fi
 			}
 			
@@ -327,6 +333,8 @@ load_acl() {
 					[ -z "${device}" ] && device="${interface}"
 					_ipt_source="-i ${device} "
 					msg="源接口【${device}】，"
+				else
+					msg="源接口【所有】，"
 				fi
 				if [ -n "$(echo ${i} | grep '^iprange:')" ]; then
 					_iprange=$(echo ${i} | sed 's#iprange:##g')
@@ -355,6 +363,8 @@ load_acl() {
 					_ipt_source=$(factor ${_mac} "${_ipt_source}-m mac --mac-source")
 					msg="${msg}MAC【${_mac}】，"
 					unset _mac
+				elif [ -n "$(echo ${i} | grep '^any')" ]; then
+					msg="${msg}所有设备，"
 				else
 					continue
 				fi
@@ -387,11 +397,12 @@ load_acl() {
 					fi
 				}
 				
-				if ([ "$tcp_proxy_mode" != "disable" ] || [ "$udp_proxy_mode" != "disable" ]) && [ -n "$redir_port" ]; then
+				if ([ "$tcp_proxy_mode" != "disable" ] || [ "$udp_proxy_mode" != "disable" ]) && [ -n "$dns_redirect_port" ]; then
 					$ipt_n -A PSW2_DNS $(comment "$remarks") -p udp ${_ipt_source} --dport 53 -j REDIRECT --to-ports $dns_redirect_port
 					$ip6t_n -A PSW2_DNS $(comment "$remarks") -p udp ${_ipt_source} --dport 53 -j REDIRECT --to-ports $dns_redirect_port 2>/dev/null
 					$ipt_n -A PSW2_DNS $(comment "$remarks") -p tcp ${_ipt_source} --dport 53 -j REDIRECT --to-ports $dns_redirect_port
 					$ip6t_n -A PSW2_DNS $(comment "$remarks") -p tcp ${_ipt_source} --dport 53 -j REDIRECT --to-ports $dns_redirect_port 2>/dev/null
+					[ -z "$(get_cache_var "ACL_${sid}_default")" ] && echolog "  - ${msg}使用与全局配置不相同节点，已将DNS强制重定向到专用 DNS 服务器。"
 				else
 					$ipt_n -A PSW2_DNS $(comment "$remarks") -p udp ${_ipt_source} --dport 53 -j RETURN
 					$ip6t_n -A PSW2_DNS $(comment "$remarks") -p udp ${_ipt_source} --dport 53 -j RETURN 2>/dev/null
@@ -445,7 +456,7 @@ load_acl() {
 					$ipt_m -A PSW2 $(comment "$remarks") -p udp ${_ipt_source} $(factor $udp_redir_ports "-m multiport --dport") -j PSW2_RULE
 					$ipt_m -A PSW2 $(comment "$remarks") -p udp ${_ipt_source} $(REDIRECT $redir_port TPROXY)
 
-					[ "$PROXY_IPV6" == "1" ] && [ "$PROXY_IPV6_UDP" == "1" ] && {
+					[ "$PROXY_IPV6" == "1" ] && {
 						$ip6t_m -A PSW2 $(comment "$remarks") -p udp ${_ipt_source} -d $FAKE_IP_6 -j PSW2_RULE 2>/dev/null
 						add_shunt_t_rule "${shunt_list6}" "$ip6t_m -A PSW2 $(comment "$remarks") -p udp ${_ipt_source} $(factor $udp_redir_ports "-m multiport --dport")" "-j PSW2_RULE" 2>/dev/null
 						$ip6t_m -A PSW2 $(comment "$remarks") -p udp ${_ipt_source} $(factor $udp_redir_ports "-m multiport --dport") -j PSW2_RULE 2>/dev/null
@@ -490,7 +501,7 @@ load_acl() {
 			fi
 		}
 
-		if ([ "$TCP_PROXY_MODE" != "disable" ] || [ "$UDP_PROXY_MODE" != "disable" ]) && [ "$NODE" != "nil" ]; then
+		if ([ "$TCP_PROXY_MODE" != "disable" ] || [ "$UDP_PROXY_MODE" != "disable" ]) && [ -n "$NODE" ]; then
 			[ -n "$DNS_REDIRECT_PORT" ] && {
 				$ipt_n -A PSW2_DNS $(comment "默认") -p udp --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT
 				$ip6t_n -A PSW2_DNS $(comment "默认") -p udp --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT 2>/dev/null
@@ -499,7 +510,7 @@ load_acl() {
 			}
 		fi
 
-		if [ "$TCP_PROXY_MODE" != "disable" ] && [ "$NODE" != "nil" ]; then
+		if [ "$TCP_PROXY_MODE" != "disable" ] && [ -n "$NODE" ]; then
 			msg2="${msg}使用 TCP 节点[$(config_n_get $NODE remarks)]"
 			if [ -n "${is_tproxy}" ]; then
 				msg2="${msg2}(TPROXY:${REDIR_PORT})"
@@ -536,7 +547,7 @@ load_acl() {
 			echolog "${msg2}"
 		fi
 
-		if [ "$UDP_PROXY_MODE" != "disable" ] && [ "$NODE" != "nil" ]; then
+		if [ "$UDP_PROXY_MODE" != "disable" ] && [ -n "$NODE" ]; then
 			msg2="${msg}使用 UDP 节点[$(config_n_get $NODE remarks)](TPROXY:${REDIR_PORT})"
 
 			$ipt_m -A PSW2 $(comment "默认") -p udp -d $FAKE_IP -j PSW2_RULE
@@ -544,12 +555,12 @@ load_acl() {
 			$ipt_m -A PSW2 $(comment "默认") -p udp $(factor $UDP_REDIR_PORTS "-m multiport --dport") -j PSW2_RULE
 			$ipt_m -A PSW2 $(comment "默认") -p udp $(REDIRECT $REDIR_PORT TPROXY)
 
-			if [ "$PROXY_IPV6_UDP" == "1" ]; then
+			[ "$PROXY_IPV6" == "1" ] && {
 				$ip6t_m -A PSW2 $(comment "默认") -p udp -d $FAKE_IP_6 -j PSW2_RULE
 				add_shunt_t_rule "${SHUNT_LIST6}" "$ip6t_m -A PSW2 $(comment "默认") -p udp $(factor $UDP_REDIR_PORTS "-m multiport --dport")" "-j PSW2_RULE"
 				$ip6t_m -A PSW2 $(comment "默认") -p udp $(factor $UDP_REDIR_PORTS "-m multiport --dport") -j PSW2_RULE
 				$ip6t_m -A PSW2 $(comment "默认") -p udp $(REDIRECT $REDIR_PORT TPROXY)
-			fi
+			}
 
 			echolog "${msg2}"
 		fi
@@ -559,16 +570,16 @@ load_acl() {
 filter_haproxy() {
 	for item in $(uci show $CONFIG | grep ".lbss=" | cut -d "'" -f 2); do
 		local ip=$(get_host_ip ipv4 $(echo $item | awk -F ":" '{print $1}') 1)
-		[ -n "$ip" ] && ipset -q add $IPSET_VPSLIST $ip
+		[ -n "$ip" ] && ipset -q add $IPSET_VPS $ip
 	done
-	echolog "加入负载均衡的节点到ipset[$IPSET_VPSLIST]直连完成"
+	echolog "加入负载均衡的节点到ipset[$IPSET_VPS]直连完成"
 }
 
 filter_vpsip() {
-	uci show $CONFIG | grep -E "(.address=|.download_address=)" | cut -d "'" -f 2 | grep -E "([0-9]{1,3}[\.]){3}[0-9]{1,3}" | grep -v "^127\.0\.0\.1$" | sed -e "/^$/d" | sed -e "s/^/add $IPSET_VPSLIST &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
-	echolog "  - [$?]加入所有IPv4节点到ipset[$IPSET_VPSLIST]直连完成"
-	uci show $CONFIG | grep -E "(.address=|.download_address=)" | cut -d "'" -f 2 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | sed -e "/^$/d" | sed -e "s/^/add $IPSET_VPSLIST6 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
-	echolog "  - [$?]加入所有IPv6节点到ipset[$IPSET_VPSLIST6]直连完成"
+	uci show $CONFIG | grep -E "(.address=|.download_address=)" | cut -d "'" -f 2 | grep -E "([0-9]{1,3}[\.]){3}[0-9]{1,3}" | grep -v "^127\.0\.0\.1$" | sed -e "/^$/d" | sed -e "s/^/add $IPSET_VPS &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
+	echolog "  - [$?]加入所有IPv4节点到ipset[$IPSET_VPS]直连完成"
+	uci show $CONFIG | grep -E "(.address=|.download_address=)" | cut -d "'" -f 2 | grep -E "([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4}" | sed -e "/^$/d" | sed -e "s/^/add $IPSET_VPS6 &/g" | awk '{print $0} END{print "COMMIT"}' | ipset -! -R
+	echolog "  - [$?]加入所有IPv6节点到ipset[$IPSET_VPS6]直连完成"
 }
 
 filter_server_port() {
@@ -595,7 +606,7 @@ filter_server_port() {
 filter_node() {
 	local node=${1}
 	local stream=${2}
-	if [ -n "$node" ] && [ "$node" != "nil" ]; then
+	if [ -n "$node" ]; then
 		local address=$(config_n_get $node address)
 		local port=$(config_n_get $node port)
 		[ -z "$address" ] && [ -z "$port" ] && {
@@ -617,27 +628,27 @@ filter_direct_node_list() {
 
 add_firewall_rule() {
 	echolog "开始加载防火墙规则..."
-	ipset -! create $IPSET_LOCALLIST nethash maxelem 1048576
-	ipset -! create $IPSET_LANLIST nethash maxelem 1048576
-	ipset -! create $IPSET_VPSLIST nethash maxelem 1048576
+	ipset -! create $IPSET_LOCAL nethash maxelem 1048576
+	ipset -! create $IPSET_LAN nethash maxelem 1048576
+	ipset -! create $IPSET_VPS nethash maxelem 1048576
 
-	ipset -! create $IPSET_LOCALLIST6 nethash family inet6 maxelem 1048576
-	ipset -! create $IPSET_LANLIST6 nethash family inet6 maxelem 1048576
-	ipset -! create $IPSET_VPSLIST6 nethash family inet6 maxelem 1048576
+	ipset -! create $IPSET_LOCAL6 nethash family inet6 maxelem 1048576
+	ipset -! create $IPSET_LAN6 nethash family inet6 maxelem 1048576
+	ipset -! create $IPSET_VPS6 nethash family inet6 maxelem 1048576
 	
 	ipset -! -R <<-EOF
-		$(ip address show | grep -w "inet" | awk '{print $2}' | awk -F '/' '{print $1}' | sed -e "s/^/add $IPSET_LOCALLIST /")
+		$(ip address show | grep -w "inet" | awk '{print $2}' | awk -F '/' '{print $1}' | sed -e "s/^/add $IPSET_LOCAL /")
 	EOF
 	ipset -! -R <<-EOF
-		$(ip address show | grep -w "inet6" | awk '{print $2}' | awk -F '/' '{print $1}' | sed -e "s/^/add $IPSET_LOCALLIST6 /")
-	EOF
-
-	ipset -! -R <<-EOF
-		$(gen_lanlist | sed -e "s/^/add $IPSET_LANLIST /")
+		$(ip address show | grep -w "inet6" | awk '{print $2}' | awk -F '/' '{print $1}' | sed -e "s/^/add $IPSET_LOCAL6 /")
 	EOF
 
 	ipset -! -R <<-EOF
-		$(gen_lanlist_6 | sed -e "s/^/add $IPSET_LANLIST6 /")
+		$(gen_lanlist | sed -e "s/^/add $IPSET_LAN /")
+	EOF
+
+	ipset -! -R <<-EOF
+		$(gen_lanlist_6 | sed -e "s/^/add $IPSET_LAN6 /")
 	EOF
 
 	# 忽略特殊IP段
@@ -650,18 +661,18 @@ add_firewall_rule() {
 		#echolog "本机IPv6网段互访直连：${lan_ip6}"
 
 		[ -n "$lan_ip" ] && ipset -! -R <<-EOF
-			$(echo $lan_ip | sed -e "s/ /\n/g" | sed -e "s/^/add $IPSET_LANLIST /")
+			$(echo $lan_ip | sed -e "s/ /\n/g" | sed -e "s/^/add $IPSET_LAN /")
 		EOF
 
 		[ -n "$lan_ip6" ] && ipset -! -R <<-EOF
-			$(echo $lan_ip6 | sed -e "s/ /\n/g" | sed -e "s/^/add $IPSET_LANLIST6 /")
+			$(echo $lan_ip6 | sed -e "s/ /\n/g" | sed -e "s/^/add $IPSET_LAN6 /")
 		EOF
 	}
 
 	[ -n "$ISP_DNS" ] && {
 		#echolog "处理 ISP DNS 例外..."
 		for ispip in $ISP_DNS; do
-			ipset -! add $IPSET_LANLIST $ispip
+			ipset -! add $IPSET_LAN $ispip
 			echolog "  - [$?]追加ISP IPv4 DNS到白名单：${ispip}"
 		done
 	}
@@ -669,18 +680,18 @@ add_firewall_rule() {
 	[ -n "$ISP_DNS6" ] && {
 		#echolog "处理 ISP IPv6 DNS 例外..."
 		for ispip6 in $ISP_DNS6; do
-			ipset -! add $IPSET_LANLIST6 $ispip6
+			ipset -! add $IPSET_LAN6 $ispip6
 			echolog "  - [$?]追加ISP IPv6 DNS到白名单：${ispip6}"
 		done
 	}
 	
-	local ipset_global_whitelist="passwall2_global_whitelist"
-	local ipset_global_whitelist6="passwall2_global_whitelist6"
-	ipset -! create $ipset_global_whitelist nethash maxelem 1048576 timeout 259200
-	ipset -! create $ipset_global_whitelist6 nethash family inet6 maxelem 1048576 timeout 259200
+	local ipset_global_white="passwall2_global_white"
+	local ipset_global_white6="passwall2_global_white6"
+	ipset -! create $ipset_global_white nethash maxelem 1048576 timeout 259200
+	ipset -! create $ipset_global_white6 nethash family inet6 maxelem 1048576 timeout 259200
 
 	#分流规则的IP列表(使用分流节点时导入)
-	gen_shunt_list ${NODE} SHUNT_LIST4 SHUNT_LIST6 ${WRITE_IPSET_DIRECT} ${ipset_global_whitelist} ${ipset_global_whitelist6}
+	gen_shunt_list ${NODE} SHUNT_LIST4 SHUNT_LIST6 ${WRITE_IPSET_DIRECT} ${ipset_global_white} ${ipset_global_white6}
 
 	#  过滤所有节点IP
 	filter_vpsip > /dev/null 2>&1 &
@@ -689,16 +700,15 @@ add_firewall_rule() {
 	accept_icmp=$(config_t_get global_forwarding accept_icmp 0)
 	accept_icmpv6=$(config_t_get global_forwarding accept_icmpv6 0)
 
-	local tcp_proxy_way=$(config_t_get global_forwarding tcp_proxy_way redirect)
-	if [ "$tcp_proxy_way" = "redirect" ]; then
+	if [ "${TCP_PROXY_WAY}" = "redirect" ]; then
 		unset is_tproxy
-	elif [ "$tcp_proxy_way" = "tproxy" ]; then
+	elif [ "${TCP_PROXY_WAY}" = "tproxy" ]; then
 		is_tproxy="TPROXY"
 	fi
 
 	$ipt_n -N PSW2
-	$ipt_n -A PSW2 $(dst $IPSET_LANLIST) -j RETURN
-	$ipt_n -A PSW2 $(dst $IPSET_VPSLIST) -j RETURN
+	$ipt_n -A PSW2 $(dst $IPSET_LAN) -j RETURN
+	$ipt_n -A PSW2 $(dst $IPSET_VPS) -j RETURN
 
 	WAN_IP=$(get_wan_ip)
 	[ ! -z "${WAN_IP}" ] && $ipt_n -A PSW2 $(comment "WAN_IP_RETURN") -d "${WAN_IP}" -j RETURN
@@ -707,14 +717,14 @@ add_firewall_rule() {
 	[ -z "${is_tproxy}" ] && insert_rule_after "$ipt_n" "PREROUTING" "prerouting_rule" "-p tcp -j PSW2"
 
 	$ipt_n -N PSW2_OUTPUT
-	$ipt_n -A PSW2_OUTPUT $(dst $IPSET_LANLIST) -j RETURN
-	$ipt_n -A PSW2_OUTPUT $(dst $IPSET_VPSLIST) -j RETURN
+	$ipt_n -A PSW2_OUTPUT $(dst $IPSET_LAN) -j RETURN
+	$ipt_n -A PSW2_OUTPUT $(dst $IPSET_VPS) -j RETURN
 	$ipt_n -A PSW2_OUTPUT -m mark --mark 0xff -j RETURN
 
 	$ipt_n -N PSW2_DNS
 	if [ $(config_t_get global dns_redirect "1") = "0" ]; then
 		#Only hijack when dest address is local IP
-		$ipt_n -I PREROUTING $(dst $IPSET_LOCALLIST) -j PSW2_DNS
+		$ipt_n -I PREROUTING $(dst $IPSET_LOCAL) -j PSW2_DNS
 	else
 		$ipt_n -I PREROUTING -j PSW2_DNS
 	fi
@@ -731,8 +741,8 @@ add_firewall_rule() {
 	$ipt_m -A PSW2_RULE -j CONNMARK --save-mark
 
 	$ipt_m -N PSW2
-	$ipt_m -A PSW2 $(dst $IPSET_LANLIST) -j RETURN
-	$ipt_m -A PSW2 $(dst $IPSET_VPSLIST) -j RETURN
+	$ipt_m -A PSW2 $(dst $IPSET_LAN) -j RETURN
+	$ipt_m -A PSW2 $(dst $IPSET_VPS) -j RETURN
 	
 	[ ! -z "${WAN_IP}" ] && $ipt_m -A PSW2 $(comment "WAN_IP_RETURN") -d "${WAN_IP}" -j RETURN
 	unset WAN_IP
@@ -741,8 +751,8 @@ add_firewall_rule() {
 	insert_rule_before "$ipt_m" "PREROUTING" "PSW2" "-p tcp -m socket -j PSW2_DIVERT"
 
 	$ipt_m -N PSW2_OUTPUT
-	$ipt_m -A PSW2_OUTPUT $(dst $IPSET_LANLIST) -j RETURN
-	$ipt_m -A PSW2_OUTPUT $(dst $IPSET_VPSLIST) -j RETURN
+	$ipt_m -A PSW2_OUTPUT $(dst $IPSET_LAN) -j RETURN
+	$ipt_m -A PSW2_OUTPUT $(dst $IPSET_VPS) -j RETURN
 	[ -n "$AUTO_DNS" ] && {
 		for auto_dns in $(echo $AUTO_DNS | tr ',' ' '); do
 			local dns_address=$(echo $auto_dns | awk -F '#' '{print $1}')
@@ -758,20 +768,20 @@ add_firewall_rule() {
 
 	[ "$accept_icmpv6" = "1" ] && {
 		$ip6t_n -N PSW2
-		$ip6t_n -A PSW2 $(dst $IPSET_LANLIST6) -j RETURN
-		$ip6t_n -A PSW2 $(dst $IPSET_VPSLIST6) -j RETURN
+		$ip6t_n -A PSW2 $(dst $IPSET_LAN6) -j RETURN
+		$ip6t_n -A PSW2 $(dst $IPSET_VPS6) -j RETURN
 		$ip6t_n -A PREROUTING -p ipv6-icmp -j PSW2
 
 		$ip6t_n -N PSW2_OUTPUT
-		$ip6t_n -A PSW2_OUTPUT $(dst $IPSET_LANLIST6) -j RETURN
-		$ip6t_n -A PSW2_OUTPUT $(dst $IPSET_VPSLIST6) -j RETURN
+		$ip6t_n -A PSW2_OUTPUT $(dst $IPSET_LAN6) -j RETURN
+		$ip6t_n -A PSW2_OUTPUT $(dst $IPSET_VPS6) -j RETURN
 		$ip6t_n -A PSW2_OUTPUT -m mark --mark 0xff -j RETURN
 	}
 	
 	$ip6t_n -N PSW2_DNS
 	if [ $(config_t_get global dns_redirect "1") = "0" ]; then
 		#Only hijack when dest address is local IP
-		$ip6t_n -I PREROUTING $(dst $IPSET_LOCALLIST6) -j PSW2_DNS
+		$ip6t_n -I PREROUTING $(dst $IPSET_LOCAL6) -j PSW2_DNS
 	else
 		$ip6t_n -I PREROUTING -j PSW2_DNS
 	fi
@@ -788,8 +798,8 @@ add_firewall_rule() {
 	$ip6t_m -A PSW2_RULE -j CONNMARK --save-mark
 
 	$ip6t_m -N PSW2
-	$ip6t_m -A PSW2 $(dst $IPSET_LANLIST6) -j RETURN
-	$ip6t_m -A PSW2 $(dst $IPSET_VPSLIST6) -j RETURN
+	$ip6t_m -A PSW2 $(dst $IPSET_LAN6) -j RETURN
+	$ip6t_m -A PSW2 $(dst $IPSET_VPS6) -j RETURN
 	
 	WAN6_IP=$(get_wan6_ip)
 	[ ! -z "${WAN6_IP}" ] && $ip6t_m -A PSW2 $(comment "WAN6_IP_RETURN") -d ${WAN6_IP} -j RETURN
@@ -800,8 +810,8 @@ add_firewall_rule() {
 
 	$ip6t_m -N PSW2_OUTPUT
 	$ip6t_m -A PSW2_OUTPUT -m mark --mark 0xff -j RETURN
-	$ip6t_m -A PSW2_OUTPUT $(dst $IPSET_LANLIST6) -j RETURN
-	$ip6t_m -A PSW2_OUTPUT $(dst $IPSET_VPSLIST6) -j RETURN
+	$ip6t_m -A PSW2_OUTPUT $(dst $IPSET_LAN6) -j RETURN
+	$ip6t_m -A PSW2_OUTPUT $(dst $IPSET_VPS6) -j RETURN
 
 	ip -6 rule add fwmark 1 table 100
 	ip -6 route add local ::/0 dev lo table 100
@@ -836,17 +846,17 @@ add_firewall_rule() {
 			fi
 		}
 		
-		if [ "$NODE" != "nil" ] && ([ "$TCP_LOCALHOST_PROXY" = "1" ] || [ "$UDP_LOCALHOST_PROXY" = "1" ]); then
+		if [ -n "$NODE" ] && ([ "$TCP_LOCALHOST_PROXY" = "1" ] || [ "$UDP_LOCALHOST_PROXY" = "1" ]); then
 			[ -n "$DNS_REDIRECT_PORT" ] && {
-				$ipt_n -A OUTPUT $(comment "PSW2") -p udp -o lo --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT
-				$ip6t_n -A OUTPUT $(comment "PSW2") -p udp -o lo --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT 2>/dev/null
-				$ipt_n -A OUTPUT $(comment "PSW2") -p tcp -o lo --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT
-				$ip6t_n -A OUTPUT $(comment "PSW2") -p tcp -o lo --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT 2>/dev/null
+				$ipt_n -A OUTPUT $(comment "PSW2_DNS") -p udp -o lo --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT
+				$ip6t_n -A OUTPUT $(comment "PSW2_DNS") -p udp -o lo --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT 2>/dev/null
+				$ipt_n -A OUTPUT $(comment "PSW2_DNS") -p tcp -o lo --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT
+				$ip6t_n -A OUTPUT $(comment "PSW2_DNS") -p tcp -o lo --dport 53 -j REDIRECT --to-ports $DNS_REDIRECT_PORT 2>/dev/null
 			}
 		fi
 	
 		# 加载路由器自身代理 TCP
-		if [ "$NODE" != "nil" ] && [ "$TCP_LOCALHOST_PROXY" = "1" ]; then
+		if [ -n "$NODE" ] && [ "$TCP_LOCALHOST_PROXY" = "1" ]; then
 			[ "$accept_icmp" = "1" ] && {
 				$ipt_n -A OUTPUT -p icmp -j PSW2_OUTPUT
 				$ipt_n -A PSW2_OUTPUT -p icmp -d $FAKE_IP $(REDIRECT)
@@ -877,14 +887,14 @@ add_firewall_rule() {
 				insert_rule_before "$ipt_m" "OUTPUT" "mwan3" "$(comment mangle-OUTPUT-PSW2) -p tcp -j PSW2_OUTPUT"
 			}
 
-			if [ "$PROXY_IPV6" == "1" ]; then
+			[ "$PROXY_IPV6" == "1" ] && {
 				$ip6t_m -A PSW2_OUTPUT -p tcp -d $FAKE_IP_6 -j PSW2_RULE
 				add_shunt_t_rule "${SHUNT_LIST6}" "$ip6t_m -A PSW2_OUTPUT -p tcp $(factor $TCP_REDIR_PORTS "-m multiport --dport")" "-j PSW2_RULE"
 				$ip6t_m -A PSW2_OUTPUT -p tcp $(factor $TCP_REDIR_PORTS "-m multiport --dport") -j PSW2_RULE
 				$ip6t_m -A PSW2 $(comment "本机") -p tcp -i lo $(REDIRECT $REDIR_PORT TPROXY)
 				$ip6t_m -A PSW2 $(comment "本机") -p tcp -i lo -j RETURN
 				insert_rule_before "$ip6t_m" "OUTPUT" "mwan3" "$(comment mangle-OUTPUT-PSW2) -p tcp -j PSW2_OUTPUT"
-			fi
+			}
 
 			[ -d "${TMP_IFACE_PATH}" ] && {
 				for iface in $(ls ${TMP_IFACE_PATH}); do
@@ -895,7 +905,7 @@ add_firewall_rule() {
 		fi
 
 		# 加载路由器自身代理 UDP
-		if [ "$NODE" != "nil" ] && [ "$UDP_LOCALHOST_PROXY" = "1" ]; then
+		if [ -n "$NODE" ] && [ "$UDP_LOCALHOST_PROXY" = "1" ]; then
 			$ipt_m -A PSW2_OUTPUT -p udp -d $FAKE_IP -j PSW2_RULE
 			add_shunt_t_rule "${SHUNT_LIST4}" "$ipt_m -A PSW2_OUTPUT -p udp $(factor $UDP_REDIR_PORTS "-m multiport --dport")" "-j PSW2_RULE"
 			$ipt_m -A PSW2_OUTPUT -p udp $(factor $UDP_REDIR_PORTS "-m multiport --dport") -j PSW2_RULE
@@ -903,14 +913,14 @@ add_firewall_rule() {
 			$ipt_m -A PSW2 $(comment "本机") -p udp -i lo -j RETURN
 			insert_rule_before "$ipt_m" "OUTPUT" "mwan3" "$(comment mangle-OUTPUT-PSW2) -p udp -j PSW2_OUTPUT"
 
-			if [ "$PROXY_IPV6_UDP" == "1" ]; then
+			[ "$PROXY_IPV6" == "1" ] && {
 				$ip6t_m -A PSW2_OUTPUT -p udp -d $FAKE_IP_6 -j PSW2_RULE
 				add_shunt_t_rule "${SHUNT_LIST6}" "$ip6t_m -A PSW2_OUTPUT -p udp $(factor $UDP_REDIR_PORTS "-m multiport --dport")" "-j PSW2_RULE"
 				$ip6t_m -A PSW2_OUTPUT -p udp $(factor $UDP_REDIR_PORTS "-m multiport --dport") -j PSW2_RULE
 				$ip6t_m -A PSW2 $(comment "本机") -p udp -i lo $(REDIRECT $REDIR_PORT TPROXY)
 				$ip6t_m -A PSW2 $(comment "本机") -p udp -i lo -j RETURN
 				insert_rule_before "$ip6t_m" "OUTPUT" "mwan3" "$(comment mangle-OUTPUT-PSW2) -p udp -j PSW2_OUTPUT"
-			fi
+			}
 
 			[ -d "${TMP_IFACE_PATH}" ] && {
 				for iface in $(ls ${TMP_IFACE_PATH}); do
@@ -933,7 +943,7 @@ add_firewall_rule() {
 	#  加载ACLS
 	load_acl
 
-	filter_direct_node_list
+	filter_direct_node_list > /dev/null 2>&1 &
 
 	echolog "防火墙规则加载完成！"
 }
