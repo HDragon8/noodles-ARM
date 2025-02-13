@@ -4,7 +4,24 @@ ACTION=${1}
 shift 1
 
 do_install() {
+  if echo `uname -m` | grep -Eqi 'x86_64'; then
+    echo "Support x86_64"
+  else
+    echo "Not x86_64, only support x86_64, exit"
+    sleep 3
+    exit 1
+  fi
+
+  if [ -e /dev/kvm ]; then
+    echo "/dev/kvm exists"
+  else
+    echo "/dev/kvm does not exist"
+    sleep 3
+    exit 2
+  fi
+
   local config=`uci get pve.@pve[0].config_path 2>/dev/null`
+  local root_pwd=`uci get pve.@pve[0].root_pwd 2>/dev/null`
   local IMAGE_NAME=`uci get pve.@pve[0].image_name 2>/dev/null`
   local tz=`uci get pve.@pve[0].time_zone 2>/dev/null`
   local port=`uci get pve.@pve[0].http_port 2>/dev/null`
@@ -33,16 +50,17 @@ do_install() {
     -v \"/var/run:/host/var/run\" \
     -v \"$config/vz:/var/lib/vz\" \
     -v \"$config/pve-cluster:/var/lib/pve-cluster\" \
-    -v \"/dev/vfio:/dev/vfio\" \
 	  --device /dev/kvm:/dev/kvm \
     -p $port:8006 \
     --dns=172.17.0.1 \
     --dns=223.5.5.5 "
 
+  [ -e "/dev/vfio" ] && cmd="$cmd -v \"/dev/vfio:/dev/vfio\""
   if [ -z "$tz" ]; then
     tz="`uci get system.@system[0].zonename | sed 's/ /_/g'`"
   fi
   [ -z "$tz" ] || cmd="$cmd -e TZ=\"$tz\""
+  [ -z "$root_pwd" ] || cmd="$cmd -e root_password=\"$root_pwd\""
 
   cmd="$cmd -v /mnt:/mnt"
   mountpoint -q /mnt && cmd="$cmd:rslave"

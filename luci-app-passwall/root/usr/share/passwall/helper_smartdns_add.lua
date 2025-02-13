@@ -23,10 +23,6 @@ local DEFAULT_PROXY_MODE = var["-DEFAULT_PROXY_MODE"]
 local NO_PROXY_IPV6 = var["-NO_PROXY_IPV6"]
 local NO_LOGIC_LOG = var["-NO_LOGIC_LOG"]
 local NFTFLAG = var["-NFTFLAG"]
-local CACHE_PATH = api.CACHE_PATH
-local CACHE_FLAG = "smartdns_" .. FLAG
-local CACHE_DNS_PATH = CACHE_PATH .. "/" .. CACHE_FLAG
-local CACHE_DNS_FILE = CACHE_DNS_PATH .. ".conf"
 
 local uci = api.uci
 local sys = api.sys
@@ -37,6 +33,7 @@ local TMP_PATH = "/tmp/etc/" .. appname
 local TMP_ACL_PATH = TMP_PATH .. "/acl"
 local RULES_PATH = "/usr/share/" .. appname .. "/rules"
 local FLAG_PATH = TMP_ACL_PATH .. "/" .. FLAG
+local TMP_CONF_FILE = FLAG_PATH .. "/smartdns.conf"
 local config_lines = {}
 local tmp_lines = {}
 local USE_GEOVIEW = uci:get(appname, "@global_rules[0]", "enable_geoview")
@@ -97,18 +94,16 @@ end
 local function get_geosite(list_arg, out_path)
 	local geosite_path = uci:get(appname, "@global_rules[0]", "v2ray_location_asset")
 	geosite_path = geosite_path:match("^(.*)/") .. "/geosite.dat"
-	if not is_file_nonzero(geosite_path) then return end
+	if not is_file_nonzero(geosite_path) then return 1 end
 	if api.is_finded("geoview") and list_arg and out_path then
 		sys.exec("geoview -type geosite -append=true -input " .. geosite_path .. " -list '" .. list_arg .. "' -output " .. out_path)
+		return 0
 	end
+	return 1
 end
 
 if not fs.access(FLAG_PATH) then
 	fs.mkdir(FLAG_PATH)
-end
-
-if not fs.access(CACHE_PATH) then
-	fs.mkdir(CACHE_PATH)
 end
 
 local LOCAL_EXTEND_ARG = ""
@@ -223,7 +218,7 @@ if DEFAULT_DNS_GROUP then
 	local domain_rules_str = "domain-rules /./ -nameserver " .. DEFAULT_DNS_GROUP
 	if DEFAULT_DNS_GROUP == REMOTE_GROUP then
 		domain_rules_str = domain_rules_str .. " -speed-check-mode none -d no -no-serve-expired"
-		if NO_PROXY_IPV6 == "1" and only_global == 1 and uci:get(appname, TCP_NODE, "protocol") ~= "_shunt" then
+		if NO_PROXY_IPV6 == "1" then
 			domain_rules_str = domain_rules_str .. " -address #6"
 		end
 	elseif DEFAULT_DNS_GROUP == LOCAL_GROUP then
@@ -264,8 +259,11 @@ if USE_BLOCK_LIST == "1" and not fs.access(file_block_host) then
 		f_out:close()
 	end
 	if USE_GEOVIEW == "1" and geosite_arg ~= "" and api.is_finded("geoview") then
-		get_geosite(geosite_arg, file_block_host)
-		log("  * 解析[屏蔽列表] Geosite 到屏蔽域名表(blocklist)完成")
+		if get_geosite(geosite_arg, file_block_host) == 0 then
+			log("  * 解析[屏蔽列表] Geosite 到屏蔽域名表(blocklist)完成")
+		else
+			log("  * 解析[屏蔽列表] Geosite 到屏蔽域名表(blocklist)失败！")
+		end
 	end
 end
 if USE_BLOCK_LIST == "1" and is_file_nonzero(file_block_host) then
@@ -281,11 +279,13 @@ end
 local file_vpslist = TMP_ACL_PATH .. "/vpslist"
 if not is_file_nonzero(file_vpslist) then
 	local f_out = io.open(file_vpslist, "w")
+	local written_domains = {}
 	uci:foreach(appname, "nodes", function(t)
 		local function process_address(address)
 			if address == "engage.cloudflareclient.com" then return end
-			if datatypes.hostname(address) then
+			if datatypes.hostname(address) and not written_domains[address] then
 				f_out:write(address .. "\n")
+				written_domains[address] = true
 			end
 		end
 		process_address(t.address)
@@ -334,8 +334,11 @@ if USE_DIRECT_LIST == "1" and not fs.access(file_direct_host) then
 		f_out:close()
 	end
 	if USE_GEOVIEW == "1" and geosite_arg ~= "" and api.is_finded("geoview") then
-		get_geosite(geosite_arg, file_direct_host)
-		log("  * 解析[直连列表] Geosite 到域名白名单(whitelist)完成")
+		if get_geosite(geosite_arg, file_direct_host) == 0 then
+			log("  * 解析[直连列表] Geosite 到域名白名单(whitelist)完成")
+		else
+			log("  * 解析[直连列表] Geosite 到域名白名单(whitelist)失败！")
+		end
 	end
 end
 if USE_DIRECT_LIST == "1" and is_file_nonzero(file_direct_host) then
@@ -379,8 +382,11 @@ if USE_PROXY_LIST == "1" and not fs.access(file_proxy_host) then
 		f_out:close()
 	end
 	if USE_GEOVIEW == "1" and geosite_arg ~= "" and api.is_finded("geoview") then
-		get_geosite(geosite_arg, file_proxy_host)
-		log("  * 解析[代理列表] Geosite 到代理域名表(blacklist)完成")
+		if get_geosite(geosite_arg, file_proxy_host) == 0 then
+			log("  * 解析[代理列表] Geosite 到代理域名表(blacklist)完成")
+		else
+			log("  * 解析[代理列表] Geosite 到代理域名表(blacklist)失败！")
+		end
 	end
 end
 if USE_PROXY_LIST == "1" and is_file_nonzero(file_proxy_host) then
@@ -541,13 +547,18 @@ if uci:get(appname, TCP_NODE, "protocol") == "_shunt" then
 	end
 
 	if USE_GFW_LIST == "1" and CHN_LIST == "0" and USE_GEOVIEW == "1" and api.is_finded("geoview") then  --仅GFW模式解析geosite
+		local return_white, return_shunt
 		if geosite_white_arg ~= "" then
-			get_geosite(geosite_white_arg, file_white_host)
+			return_white = get_geosite(geosite_white_arg, file_white_host)
 		end
 		if geosite_shunt_arg ~= "" then
-			get_geosite(geosite_shunt_arg, file_shunt_host)
+			return_shunt = get_geosite(geosite_shunt_arg, file_shunt_host)
 		end
-		log("  * 解析[分流节点] Geosite 完成")
+		if (return_white == nil or return_white == 0) and (return_shunt == nil or return_shunt == 0) then
+			log("  * 解析[分流节点] Geosite 完成")
+		else
+			log("  * 解析[分流节点] Geosite 失败！")
+		end
 	end
 
 	if is_file_nonzero(file_white_host) then
@@ -603,7 +614,7 @@ if uci:get(appname, TCP_NODE, "protocol") == "_shunt" then
 end
 
 if #config_lines > 0 then
-	local f_out = io.open(CACHE_DNS_FILE, "w")
+	local f_out = io.open(TMP_CONF_FILE, "w")
 	for i = 1, #config_lines do
 		line = config_lines[i]
 		if line ~= "" and not line:find("^#--") then
@@ -617,6 +628,6 @@ if DEFAULT_DNS_GROUP then
 	log(string.format("  - 默认 DNS 分组：%s", DEFAULT_DNS_GROUP))
 end
 
-fs.symlink(CACHE_DNS_FILE, SMARTDNS_CONF)
+fs.symlink(TMP_CONF_FILE, SMARTDNS_CONF)
 sys.call(string.format('echo "conf-file %s" >> /etc/smartdns/custom.conf', string.gsub(SMARTDNS_CONF, appname, appname .. "*")))
 log("  - 请让SmartDNS作为Dnsmasq的上游或重定向！")
