@@ -4,6 +4,52 @@
 ACTION=${1}
 shift 1
 
+istoreenhance_pull() {
+  local image_name="$1"
+  local isInstall=$(command -v iStoreEnhance)
+  local isRun=$(pgrep iStoreEnhance)
+
+  # 判断iStoreEnhance是否运行
+  if [ -n "$isRun" ]; then
+    # 使用 docker info 获取包含 registry.linkease.net 的镜像服务器地址
+    local registry_mirror=$(docker info 2>/dev/null | awk -F': ' '/Registry Mirrors:/ {found=1; next} found && NF {if ($0 ~ /registry.linkease.net/) {print; exit}}')
+
+    if [[ -n "$registry_mirror" ]]; then
+      # 提取主机和端口部分
+      local registry_host=$(echo ${registry_mirror} | sed -E 's|^https?://([^/]+).*|\1|')
+      # 拼接完整的镜像地址
+      local full_image_name="$registry_host/$image_name"
+      echo "istoreenhance_pull ${full_image_name}"
+      # 直接拉取镜像
+      docker pull "$full_image_name"
+      if [ $? -ne 0 ]; then
+        echo "istoreenhance_pull failed"
+      exit 1
+      fi
+    else
+      echo "istoreenhance_pull ${image_name}"
+      docker pull "$image_name"
+      if [ $? -ne 0 ]; then
+        echo "download failed, not found registry.linkease.net"
+      exit 1
+      fi
+    fi
+  else
+    # 否则运行 docker pull
+    echo "docker pull ${image_name}"
+    docker pull "$image_name"
+    if [ $? -ne 0 ]; then
+    # 判断是否安装 iStoreEnhance
+      if [ -z "$isInstall" ]; then
+        echo "download failed, install istoreenhance to speedup, \"https://doc.linkease.com/zh/guide/istore/software/istoreenhance.html\""
+      else
+        echo "download failed, enable istoreenhance to speedup"
+      fi
+      exit 1
+    fi
+  fi
+}
+
 do_install() {
   local port=`uci get immich.@main[0].port 2>/dev/null`
   local config=`uci get immich.@main[0].config_path 2>/dev/null`
@@ -35,24 +81,17 @@ do_install() {
 
   cd $config
   export COMPOSE_PROJECT_NAME=linkease-immich
-  docker pull tensorchord/pgvecto-rs:pg14-v0.2.0@sha256:90724186f0a3517cf6914295b5ab410db9ce23190a2d9d0b9dd6463e3fa298f0
-  RET=$?
-  if [ ! "$RET" = "0" ]; then
-    echo "download failed"
-    exit 1
-  fi
-  docker pull "immich-app/immich-machine-learning:$IMMICH_VERSION"
-  RET=$?
-  if [ ! "$RET" = "0" ]; then
-    echo "download failed"
-    exit 1
-  fi
-  docker pull "immich-app/immich-server:$IMMICH_VERSION"
-  RET=$?
-  if [ ! "$RET" = "0" ]; then
-    echo "download failed"
-    exit 1
-  fi
+
+  istoreenhance_pull redis:6.2-alpine@sha256:905c4ee67b8e0aa955331960d2aa745781e6bd89afc44a8584bfd13bc890f0ae
+
+  istoreenhance_pull tensorchord/pgvecto-rs:pg14-v0.2.0@sha256:90724186f0a3517cf6914295b5ab410db9ce23190a2d9d0b9dd6463e3fa298f0
+
+  istoreenhance_pull "linkease/immich-machine-learning:$IMMICH_VERSION"
+  
+
+  istoreenhance_pull "linkease/immich-server:$IMMICH_VERSION"
+  
+
   docker-compose down || true
   docker-compose up -d
 }
@@ -82,10 +121,10 @@ case ${ACTION} in
     cd $config && docker-compose ${ACTION}
   ;;
   "status")
-    docker ps --all -f 'name=^/linkease-immich_frontend_1$' --format '{{.State}}'
+    docker ps --all -f 'name=^/immich_server$' --format '{{.State}}'
   ;;
   "port")
-    docker ps --all -f 'name=^/linkease-immich_frontend_1$' --format '{{.Ports}}' | grep -om1 '0.0.0.0:[0-9]*' | sed 's/0.0.0.0://'
+    docker ps --all -f 'name=^/immich_server$' --format '{{.Ports}}' | grep -om1 '0.0.0.0:[0-9]*' | sed 's/0.0.0.0://'
   ;;
   *)
     usage
