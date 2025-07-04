@@ -11,9 +11,8 @@ end
 
 local fs = api.fs
 local sys = api.sys
-local has_singbox = api.finded_com("singbox")
+local has_singbox = api.finded_com("sing-box")
 local has_xray = api.finded_com("xray")
-local has_geoview = api.is_finded("geoview")
 local has_gfwlist = fs.access("/usr/share/passwall/rules/gfwlist")
 local has_chnlist = fs.access("/usr/share/passwall/rules/chnlist")
 local has_chnroute = fs.access("/usr/share/passwall/rules/chnroute")
@@ -24,9 +23,7 @@ end
 
 local nodes_table = {}
 for k, e in ipairs(api.get_valid_nodes()) do
-	if not(e.type == "sing-box" and e.protocol == "_shunt" and not has_geoview) then  --Sing-Box分流节点缺少geoview组件时不允许使用
-		nodes_table[#nodes_table + 1] = e
-	end
+	nodes_table[#nodes_table + 1] = e
 end
 
 local dynamicList_write = function(self, section, value)
@@ -253,6 +250,13 @@ o.validate = port_validate
 o:depends({ use_global_config = true })
 o:depends({ _udp_node_bool = "1" })
 
+o = s:option(DummyValue, "tips", "　")
+o.rawhtml = true
+o.cfgvalue = function(t, n)
+	return string.format('<font color="red">%s</font>',
+	translate("The port settings support single ports and ranges.<br>Separate multiple ports with commas (,).<br>Example: 21,80,443,1000:2000."))
+end
+
 o = s:option(Flag, "use_direct_list", translatef("Use %s", translate("Direct List")))
 o.default = "1"
 o:depends({ _tcp_node_bool = "1" })
@@ -308,7 +312,10 @@ o.default = "0"
 o:depends({ _tcp_node_bool = "1" })
 
 ---- DNS Forward Mode
-o = s:option(ListValue, "dns_mode", translate("Filter Mode"))
+o = s:option(ListValue, "dns_mode", translate("Filter Mode"),
+			 "<font color='red'>" .. translate(
+				 "If the node uses Xray/Sing-Box shunt, select the matching filter mode (Xray/Sing-Box).") ..
+				 "</font>")
 o:depends({ _tcp_node_bool = "1" })
 if api.is_finded("dns2socks") then
 	o:value("dns2socks", "dns2socks")

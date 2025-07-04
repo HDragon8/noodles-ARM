@@ -2,9 +2,8 @@ local api = require "luci.passwall.api"
 local appname = "passwall"
 local datatypes = api.datatypes
 local fs = api.fs
-local has_singbox = api.finded_com("singbox")
+local has_singbox = api.finded_com("sing-box")
 local has_xray = api.finded_com("xray")
-local has_geoview = api.is_finded("geoview")
 local has_gfwlist = fs.access("/usr/share/passwall/rules/gfwlist")
 local has_chnlist = fs.access("/usr/share/passwall/rules/chnlist")
 local has_chnroute = fs.access("/usr/share/passwall/rules/chnroute")
@@ -15,9 +14,7 @@ api.set_apply_on_parse(m)
 
 local nodes_table = {}
 for k, e in ipairs(api.get_valid_nodes()) do
-	if not(e.type == "sing-box" and e.protocol == "_shunt" and not has_geoview) then  --Sing-Box分流节点缺少geoview组件时不允许使用
-		nodes_table[#nodes_table + 1] = e
-	end
+	nodes_table[#nodes_table + 1] = e
 end
 
 local normal_list = {}
@@ -168,7 +165,7 @@ if (has_singbox or has_xray) and #nodes_table > 0 then
 			local vid = v.id
 			-- shunt node type, Sing-Box or Xray
 			local type = s:taboption("Main", ListValue, vid .. "-type", translate("Type"))
-			if has_singbox and has_geoview then
+			if has_singbox then
 				type:value("sing-box", "Sing-Box")
 			end
 			if has_xray then
@@ -287,7 +284,7 @@ if (has_singbox or has_xray) and #nodes_table > 0 then
 			end
 		end
 	else
-		local tips = s:taboption("Main", DummyValue, "tips", " ")
+		local tips = s:taboption("Main", DummyValue, "tips", "　")
 		tips.rawhtml = true
 		tips.cfgvalue = function(t, n)
 			return string.format('<a style="color: red">%s</a>', translate("There are no available nodes, please add or subscribe nodes first."))
@@ -368,15 +365,15 @@ o:value("119.28.28.28")
 o:depends("direct_dns_mode", "tcp")
 
 o = s:taboption("DNS", Value, "direct_dns_dot", translate("Direct DNS DoT"))
-o.default = "tls://1.12.12.12"
-o:value("tls://1.12.12.12")
-o:value("tls://120.53.53.53")
-o:value("tls://36.99.170.86")
-o:value("tls://101.198.191.4")
-o:value("tls://223.5.5.5")
-o:value("tls://223.6.6.6")
-o:value("tls://2400:3200::1")
-o:value("tls://2400:3200:baba::1")
+o.default = "tls://dot.pub@1.12.12.12"
+o:value("tls://dot.pub@1.12.12.12")
+o:value("tls://dot.pub@120.53.53.53")
+o:value("tls://dot.360.cn@36.99.170.86")
+o:value("tls://dot.360.cn@101.198.191.4")
+o:value("tls://dns.alidns.com@223.5.5.5")
+o:value("tls://dns.alidns.com@223.6.6.6")
+o:value("tls://dns.alidns.com@2400:3200::1")
+o:value("tls://dns.alidns.com@2400:3200:baba::1")
 o.validate = chinadns_dot_validate
 o:depends("direct_dns_mode", "dot")
 
@@ -384,7 +381,10 @@ o = s:taboption("DNS", Flag, "filter_proxy_ipv6", translate("Filter Proxy Host I
 o.default = "0"
 
 ---- DNS Forward Mode
-o = s:taboption("DNS", ListValue, "dns_mode", translate("Filter Mode"))
+o = s:taboption("DNS", ListValue, "dns_mode", translate("Filter Mode"),
+			 "<font color='red'>" .. translate(
+				 "If the node uses Xray/Sing-Box shunt, select the matching filter mode (Xray/Sing-Box).") ..
+				 "</font>")
 o:value("udp", translatef("Requery DNS By %s", "UDP"))
 o:value("tcp", translatef("Requery DNS By %s", "TCP"))
 if chinadns_tls == 0 then
@@ -405,7 +405,10 @@ end
 
 ---- SmartDNS Forward Mode
 if api.is_finded("smartdns") then
-	o = s:taboption("DNS", ListValue, "smartdns_dns_mode", translate("Filter Mode"))
+	o = s:taboption("DNS", ListValue, "smartdns_dns_mode", translate("Filter Mode"),
+				 "<font color='red'>" .. translate(
+					 "If the node uses Xray/Sing-Box shunt, select the matching filter mode (Xray/Sing-Box).") ..
+					 "</font>")
 	o:value("socks", "Socks")
 	if has_singbox then
 		o:value("sing-box", "Sing-Box")
@@ -431,7 +434,7 @@ if api.is_finded("smartdns") then
 	o:value("https://8.8.8.8/dns-query")
 	o:value("https://9.9.9.9/dns-query")
 	o:value("https://208.67.222.222/dns-query")
-	o:value("https://dns.adguard.com/dns-query,176.103.130.130")
+	o:value("https://dns.adguard.com/dns-query,94.140.14.14")
 	o:value("https://doh.libredns.gr/dns-query,116.202.176.26")
 	o:value("https://doh.libredns.gr/ads,116.202.176.26")
 	o:depends({ dns_shunt = "smartdns", smartdns_dns_mode = "socks" })
@@ -518,17 +521,17 @@ o:depends({singbox_dns_mode = "tcp"})
 
 ---- DoT
 o = s:taboption("DNS", Value, "remote_dns_dot", translate("Remote DNS DoT"))
-o.default = "tls://1.1.1.1"
-o:value("tls://1.0.0.1", "1.0.0.1 (CloudFlare)")
-o:value("tls://1.1.1.1", "1.1.1.1 (CloudFlare)")
-o:value("tls://8.8.4.4", "8.8.4.4 (Google)")
-o:value("tls://8.8.8.8", "8.8.8.8 (Google)")
-o:value("tls://9.9.9.9", "9.9.9.9 (Quad9)")
-o:value("tls://149.112.112.112", "149.112.112.112 (Quad9)")
-o:value("tls://94.140.14.14", "94.140.14.14 (AdGuard)")
-o:value("tls://94.140.15.15", "94.140.15.15 (AdGuard)")
-o:value("tls://208.67.222.222", "208.67.222.222 (OpenDNS)")
-o:value("tls://208.67.220.220", "208.67.220.220 (OpenDNS)")
+o.default = "tls://one.one.one.one@1.1.1.1"
+o:value("tls://one.one.one.one@1.0.0.1", "1.0.0.1 (CloudFlare)")
+o:value("tls://one.one.one.one@1.1.1.1", "1.1.1.1 (CloudFlare)")
+o:value("tls://dns.google@8.8.4.4", "8.8.4.4 (Google)")
+o:value("tls://dns.google@8.8.8.8", "8.8.8.8 (Google)")
+o:value("tls://dns.quad9.net@9.9.9.9", "9.9.9.9 (Quad9)")
+o:value("tls://dns.quad9.net@149.112.112.112", "149.112.112.112 (Quad9)")
+o:value("tls://dns.adguard.com@94.140.14.14", "94.140.14.14 (AdGuard)")
+o:value("tls://dns.adguard.com@94.140.15.15", "94.140.15.15 (AdGuard)")
+o:value("tls://dns.opendns.com@208.67.222.222", "208.67.222.222 (OpenDNS)")
+o:value("tls://dns.opendns.com@208.67.220.220", "208.67.220.220 (OpenDNS)")
 o.validate = chinadns_dot_validate
 o:depends("dns_mode", "dot")
 
@@ -555,8 +558,7 @@ o.description = translate("Notify the DNS server when the DNS query is notified,
 o.datatype = "ipaddr"
 o:depends({dns_mode = "sing-box"})
 o:depends({dns_mode = "xray"})
-o:depends("smartdns_dns_mode", "sing-box")
-o:depends("smartdns_dns_mode", "xray")
+o:depends("dns_shunt", "smartdns")
 
 o = s:taboption("DNS", Flag, "remote_fakedns", "FakeDNS", translate("Use FakeDNS work in the shunt domain that proxy."))
 o.default = "0"
@@ -606,6 +608,19 @@ o:depends({dns_shunt = "dnsmasq", tcp_proxy_mode = "proxy", chn_list = "direct"}
 if api.is_finded("smartdns") then
 	o:depends({dns_shunt = "smartdns", tcp_proxy_mode = "proxy", chn_list = "direct"})
 end
+
+o = s:taboption("DNS", Flag, "force_https_soa", translate("Force HTTPS SOA"), translate("Force queries with qtype 65 to respond with an SOA record."))
+o.default = "1"
+o.rmempty = false
+o:depends({dns_shunt = "chinadns-ng"})
+if api.is_finded("smartdns") then
+	o:depends({dns_shunt = "smartdns"})
+end
+
+o = s:taboption("DNS", Flag, "chinadns_ng_cert_verify", translate("DoT Cert verify"), translate("Verify DoT SSL cert. (May fail on some platforms!)"))
+o.default = "0"
+o:depends({direct_dns_mode = "dot"})
+o:depends({dns_mode = "dot"})
 
 o = s:taboption("DNS", Flag, "dns_redirect", translate("DNS Redirect"), translate("Force special DNS server to need proxy devices."))
 o.default = "1"
@@ -670,7 +685,7 @@ o = s:taboption("Proxy", Flag, "client_proxy", translate("Client Proxy"), transl
 o.default = "1"
 o.rmempty = false
 
-o = s:taboption("Proxy", DummyValue, "_proxy_tips", " ")
+o = s:taboption("Proxy", DummyValue, "_proxy_tips", "　")
 o.rawhtml = true
 o.cfgvalue = function(t, n)
 	return string.format('<a style="color: red" href="%s">%s</a>', api.url("acl"), translate("Want different devices to use different proxy modes/ports/nodes? Please use access control."))
@@ -716,7 +731,7 @@ o = s:taboption("log", Flag, "log_chinadns_ng", translate("Enable") .. " ChinaDN
 o.default = "0"
 o.rmempty = false
 
-o = s:taboption("log", DummyValue, "_log_tips", " ")
+o = s:taboption("log", DummyValue, "_log_tips", "　")
 o.rawhtml = true
 o.cfgvalue = function(t, n)
 	return string.format('<font color="red">%s</font>', translate("It is recommended to disable logging during regular use to reduce system overhead."))

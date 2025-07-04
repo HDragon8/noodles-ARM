@@ -121,6 +121,9 @@ msgstr "您只需要在SmartDNS配置好国内DNS分组，并设置重定向或�
 msgid "Filter Mode"
 msgstr "过滤模式"
 
+msgid "If the node uses Xray/Sing-Box shunt, select the matching filter mode (Xray/Sing-Box)."
+msgstr "当节点使用 Xray/Sing-Box 分流时，过滤模式需对应选择 Xray/Sing-Box 。"
+
 msgid "A/AAAA type"
 msgstr "A/AAAA 类型"
 
@@ -232,8 +235,20 @@ msgstr "清空 IPSET"
 msgid "Clear NFTSET"
 msgstr "清空 NFTSET"
 
+msgid "DoT Cert verify"
+msgstr "DoT 证书验证"
+
+msgid "Verify DoT SSL cert. (May fail on some platforms!)"
+msgstr "验证 DoT SSL 证书。（在某些平台可能无法验证，谨慎开启！）"
+
 msgid "Try this feature if the rule modification does not take effect."
 msgstr "如果修改规则后没有生效，请尝试此功能。"
+
+msgid "Force HTTPS SOA"
+msgstr "停用 HTTPS 记录解析"
+
+msgid "Force queries with qtype 65 to respond with an SOA record."
+msgstr "强制使 qtype 65 查询返回 SOA。"
 
 msgid "Are you sure to hide?"
 msgstr "你确定要隐藏吗？"
@@ -349,11 +364,8 @@ msgstr "添加节点"
 msgid "Add the node via the link"
 msgstr "通过链接添加节点"
 
-msgid "Share Link"
-msgstr "分享链接"
-
-msgid "Not a subscription link!!!"
-msgstr "不是订阅链接！！！"
+msgid "Enter share links, one per line. Subscription links are not supported!"
+msgstr "输入分享链接，支持多个节点，每行一个。请勿输入订阅链接！"
 
 msgid "Please enter the correct link."
 msgstr "请输入正确的链接。"
@@ -445,8 +457,14 @@ msgstr "用于检测连接状态的网址。"
 msgid "Probe Interval"
 msgstr "探测间隔"
 
-msgid "The interval between initiating probes. Every time this time elapses, a server status check is performed on a server. The time format is numbers + units, such as '10s', '2h45m', and the supported time units are <code>ns</code>, <code>us</code>, <code>ms</code>, <code>s</code>, <code>m</code>, <code>h</code>, which correspond to nanoseconds, microseconds, milliseconds, seconds, minutes, and hours, respectively."
-msgstr "发起探测的间隔。每经过这个时间，就会对一个服务器进行服务器状态检测。时间格式为数字+单位，比如<code>&quot;10s&quot;</code>, <code>&quot;2h45m&quot;</code>，支持的时间单位有 <code>ns</code>，<code>us</code>，<code>ms</code>，<code>s</code>，<code>m</code>，<code>h</code>，分别对应纳秒、微秒、毫秒、秒、分、时。"
+msgid "The interval between initiating probes. The time format is numbers + units, such as '10s', '2h45m', and the supported time units are <code>ns</code>, <code>us</code>, <code>ms</code>, <code>s</code>, <code>m</code>, <code>h</code>, which correspond to nanoseconds, microseconds, milliseconds, seconds, minutes, and hours, respectively."
+msgstr "发起探测的间隔。时间格式为数字+单位，比如<code>&quot;10s&quot;</code>, <code>&quot;2h45m&quot;</code>，支持的时间单位有 <code>ns</code>，<code>us</code>，<code>ms</code>，<code>s</code>，<code>m</code>，<code>h</code>，分别对应纳秒、微秒、毫秒、秒、分、时。"
+
+msgid "Preferred Node Count"
+msgstr "优选节点数量"
+
+msgid "The load balancer selects the optimal number of nodes, and traffic is randomly distributed among them."
+msgstr "负载均衡器选出最优节点的个数，流量将在这几个节点中随机分配。"
 
 msgid "Shunt"
 msgstr "分流"
@@ -508,8 +526,8 @@ msgstr "仅 IPv6"
 msgid "Load balancing node list"
 msgstr "负载均衡节点列表"
 
-msgid "Load balancing node list, <a target='_blank' href='https://toutyrater.github.io/routing/balance2.html'>document</a>"
-msgstr "负载均衡节点列表，<a target='_blank' href='https://toutyrater.github.io/routing/balance2.html'>文档原理</a>"
+msgid "Load balancing node list, <a target='_blank' href='https://xtls.github.io/config/routing.html#balancerobject'>document</a>"
+msgstr "负载均衡节点列表，<a target='_blank' href='https://xtls.github.io/config/routing.html#balancerobject'>文档原理</a>"
 
 msgid "From Share URL"
 msgstr "导入分享URL"
@@ -519,6 +537,9 @@ msgstr "导出分享URL"
 
 msgid "Generate QRCode"
 msgstr "生成二维码"
+
+msgid "Export Config File"
+msgstr "导出配置文件"
 
 msgid "Import Finished"
 msgstr "导入完成："
@@ -702,6 +723,9 @@ msgstr "UDP 不转发端口"
 
 msgid "Fill in the ports you don't want to be forwarded by the agent, with the highest priority."
 msgstr "填写你不希望被代理转发的端口，优先级最高。"
+
+msgid "The port settings support single ports and ranges.<br>Separate multiple ports with commas (,).<br>Example: 21,80,443,1000:2000."
+msgstr "以上端口设置支持单端口和端口范围。<br>多个端口用英文逗号(,)隔开。<br>例：21,80,443,1000:2000。"
 
 msgid "TCP Proxy Drop Ports"
 msgstr "TCP 转发屏蔽端口"
@@ -1057,6 +1081,9 @@ msgstr "删除所有订阅节点"
 msgid "Delete the subscribed node"
 msgstr "删除已订阅的节点"
 
+msgid "Are you sure you want to delete all subscribed nodes?"
+msgstr "您确定要删除所有已订阅的节点吗？"
+
 msgid "Manual subscription All"
 msgstr "手动订阅全部"
 
@@ -1228,6 +1255,9 @@ msgstr "需要节点支持"
 msgid "plugin"
 msgstr "插件"
 
+msgid "Supports custom SIP003 plugins, Make sure the plugin is installed."
+msgstr "支持自定义 SIP003 插件，请确保插件已安装。"
+
 msgid "opts"
 msgstr "插件选项"
 
@@ -1290,6 +1320,9 @@ msgstr "原版Trojan只支持'tls'，请选择'tls'。"
 
 msgid "Transfer mode"
 msgstr "传输模式"
+
+msgid "Do not send server name in ClientHello."
+msgstr "不要在 ClientHello 中发送服务器名称。"
 
 msgid "Domain"
 msgstr "域名"
@@ -1633,9 +1666,6 @@ msgstr "空闲超时 "
 msgid "Hop Interval"
 msgstr "端口跳跃时间 "
 
-msgid "Additional ports for hysteria hop"
-msgstr "端口跳跃额外端口"
-
 msgid "HeartbeatPeriod(second)"
 msgstr "心跳周期（单位：秒）"
 
@@ -1825,5 +1855,53 @@ msgstr "当选择的出站发生变化时中断现有连接。"
 msgid "Port hopping range"
 msgstr "端口跳跃范围"
 
-msgid "Format as 1000:2000 Multiple groups are separated by commas (,)."
-msgstr "格式为：1000:2000 多组时用逗号(,)隔开。"
+msgid "Format as 1000:2000 or 1000-2000 Multiple groups are separated by commas (,)."
+msgstr "格式为：1000:2000 或 1000-2000 多组时用逗号(,)隔开。"
+
+msgid "Use Custom Config"
+msgstr "使用自定义配置"
+
+msgid "Custom Config"
+msgstr "自定义配置"
+
+msgid "Must be JSON text!"
+msgstr "必须是 JSON 文本内容！"
+
+msgid "Geo View"
+msgstr "Geo 查询"
+
+msgid "Query"
+msgstr "查询"
+
+msgid "Querying"
+msgstr "查询中"
+
+msgid "Please enter query content!"
+msgstr "请输入查询内容！"
+
+msgid "No results were found!"
+msgstr "未找到任何结果！"
+
+msgid "Domain/IP Query"
+msgstr "域名/IP 查询"
+
+msgid "GeoIP/Geosite Query"
+msgstr "GeoIP/Geosite 查询"
+
+msgid "Enter a domain or IP to query the Geo rule list they belong to."
+msgstr "输入域名/IP，查询它们所在的 Geo 规则列表。"
+
+msgid "Enter a GeoIP or Geosite to extract the domains/IPs they contain. Format: geoip:cn or geosite:gfw"
+msgstr "输入 GeoIP/Geosite，提取它们所包含的域名/IP。格式：geoip:cn 或 geosite:gfw"
+
+msgid "Tips:"
+msgstr "小贴士："
+
+msgid "By entering a domain or IP, you can query the Geo rule list they belong to."
+msgstr "可以通过输入域名/IP，查询它们所在的 Geo 规则列表。"
+
+msgid "By entering a GeoIP or Geosite, you can extract the domains/IPs they contain."
+msgstr "可以通过输入 GeoIP/Geosite，提取它们所包含的域名/IP。"
+
+msgid "Use the GeoIP/Geosite query function to verify if the entered Geo rules are correct."
+msgstr "利用 GeoIP/Geosite 查询功能，可以验证输入的 Geo 规则是否正确。"

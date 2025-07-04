@@ -1,7 +1,7 @@
 local api = require "luci.passwall2.api"
 local appname = api.appname
 local datatypes = api.datatypes
-local has_singbox = api.finded_com("singbox")
+local has_singbox = api.finded_com("sing-box")
 local has_xray = api.finded_com("xray")
 
 m = Map(appname)
@@ -306,7 +306,7 @@ o:value("https://8.8.8.8/dns-query", "Google 8888")
 o:value("https://9.9.9.9/dns-query", "Quad9-Recommended 9.9.9.9")
 o:value("https://149.112.112.112/dns-query", "Quad9-Recommended 149.112.112.112")
 o:value("https://208.67.222.222/dns-query", "OpenDNS")
-o:value("https://dns.adguard.com/dns-query,176.103.130.130", "AdGuard")
+o:value("https://dns.adguard.com/dns-query,94.140.14.14", "AdGuard")
 o:value("https://doh.libredns.gr/dns-query,116.202.176.26", "LibreDNS")
 o:value("https://doh.libredns.gr/ads,116.202.176.26", "LibreDNS (No Ads)")
 o.validate = doh_validate
@@ -351,9 +351,9 @@ o.default = "1"
 o.rmempty = false
 
 if (m:get("@global_forwarding[0]", "use_nft") or "0") == "1" then
-	o = s:taboption("DNS", Button, "clear_ipset", translate("Clear NFTSET"), translate("Try this feature if the rule modification does not take effect."))
+	o = s:taboption("DNS", Button, "clear_ipset", translate("Clear NFTSet"), translate("Try this feature if the rule modification does not take effect."))
 else
-	o = s:taboption("DNS", Button, "clear_ipset", translate("Clear IPSET"), translate("Try this feature if the rule modification does not take effect."))
+	o = s:taboption("DNS", Button, "clear_ipset", translate("Clear IPSet"), translate("Try this feature if the rule modification does not take effect."))
 end
 o.inputstyle = "remove"
 function o.write(e, e)
