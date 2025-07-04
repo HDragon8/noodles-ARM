@@ -50,7 +50,7 @@ git clone --depth 1 https://github.com/linkease/istore && mv -n istore/luci/* ./
 git clone --depth 1 https://github.com/linkease/openwrt-app-actions && mv -n openwrt-app-actions/applications/* ./;rm -rf openwrt-app-actions
 git clone --depth 1 https://github.com/sirpdboy/luci-app-lucky
 git clone --depth 1 https://github.com/sirpdboy/luci-app-ddns-go ddns-go1 && mvdir ddns-go1
-git clone --depth 1 https://github.com/sirpdboy/netspeedtest && mvdir netspeedtest
+# git clone --depth 1 https://github.com/sirpdboy/netspeedtest && mvdir netspeedtest
 git clone --depth 1 https://github.com/gngpp/luci-theme-design
 git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config
@@ -147,7 +147,11 @@ sed -i \
 
 #删除没有依赖的包
 rm -rf luci-app-samba
-
+rm -rf luci-app-netspeedtest
+rm -rf sendat
+rm -rf sms-tool
+rm -rf luci-app-wrtbwmon
+rm -rf wrtbwmon
 
 sed -i 's/PKG_VERSION:=20240302/PKG_VERSION:=20240223/g; s/PKG_RELEASE:=$(AUTORELESE)/PKG_RELEASE:=1/g' webd/Makefile
 sed -i 's/luci-lib-ipkg/luci-base/g' luci-app-store/Makefile
