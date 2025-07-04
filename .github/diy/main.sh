@@ -27,7 +27,7 @@ git clone --depth 1 https://github.com/messense/aliyundrive-fuse aliyundrive && 
 git clone --depth 1 https://github.com/ElvenP/luci-app-onliner
 git clone --depth 1 https://github.com/rufengsuixing/luci-app-usb3disable
 git clone --depth 1 https://github.com/riverscn/openwrt-iptvhelper && mvdir openwrt-iptvhelper
-git clone --depth 1 https://github.com/sbwml/openwrt-alist && mvdir openwrt-alist
+git clone --depth 1 https://github.com/sbwml/luci-app-openlist && mvdir luci-app-openlist
 git clone --depth 1 https://github.com/tty228/luci-app-wechatpush
 git clone --depth 1 https://github.com/esirplayground/luci-app-poweroff
 git clone --depth 1 https://github.com/noiver/luci-app-jd-dailybonus
@@ -51,7 +51,7 @@ git clone --depth 1 https://github.com/linkease/openwrt-app-actions && mv -n ope
 git clone --depth 1 https://github.com/sirpdboy/luci-app-lucky
 git clone --depth 1 https://github.com/sirpdboy/luci-app-ddns-go ddns-go1 && mvdir ddns-go1
 git clone --depth 1 https://github.com/sirpdboy/netspeedtest && mvdir netspeedtest
-#git clone --depth 1 -b js https://github.com/gngpp/luci-theme-design
+git clone --depth 1 https://github.com/gngpp/luci-theme-design
 git clone --depth 1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth 1 https://github.com/jerrykuku/luci-app-argon-config
 git clone --depth 1 https://github.com/sirpdboy/chatgpt-web
