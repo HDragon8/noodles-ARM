@@ -152,9 +152,9 @@ if [ -n "$OP_CV" ] && [ -n "$OP_LV" ] && version_compare "$OP_CV" "$OP_LV" && [ 
                continue
             else
                if [ -x "/bin/opkg" ]; then
-                  LOG_OUT "Error:【OpenClash - v$LAST_VER】pre update test failed after 3 attempts, the file is saved in /tmp/openclash.ipk, please try to update manually with【opkg install /tmp/openclash.ipk】"
+                  LOG_OUT "Error:【OpenClash - v$LAST_VER】Pre update test failed after 3 attempts, the file is saved in /tmp/openclash.ipk, please try to update manually with【opkg install /tmp/openclash.ipk】"
                elif [ -x "/usr/bin/apk" ]; then
-                  LOG_OUT "Error:【OpenClash - v$LAST_VER】pre update test failed after 3 attempts, the file is saved in /tmp/openclash.apk, please try to update manually with【apk add -q --force-overwrite --clean-protected --allow-untrusted /tmp/openclash.apk】"
+                  LOG_OUT "Error:【OpenClash - v$LAST_VER】Pre update test failed after 3 attempts, the file is saved in /tmp/openclash.apk, please try to update manually with【apk add -q --force-overwrite --clean-protected --allow-untrusted /tmp/openclash.apk】"
                fi
                if [ "$(uci -q get openclash.config.restart)" -eq 1 ]; then
                   uci -q set openclash.config.restart=0
@@ -247,11 +247,6 @@ check_install_success()
 
 uci -q set openclash.config.enable=0
 uci -q commit openclash
-
-if [ -x "/bin/opkg" ]; then
-   LOG_OUT "Tip: Uninstalling the old version, please do not refresh the page or do other operations..."
-   opkg remove --force-depends --force-remove luci-app-openclash
-fi
 
 install_retry_count=0
 max_install_retries=3

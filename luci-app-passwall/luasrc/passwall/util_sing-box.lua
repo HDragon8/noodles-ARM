@@ -159,9 +159,7 @@ function gen_outbound(flag, node, tag, proxy_table)
 				--max_version = "1.3",
 				ech = {
 					enabled = (node.ech == "1") and true or false,
-					config = node.ech_config and split(node.ech_config:gsub("\\n", "\n"), "\n") or {},
-					pq_signature_schemes_enabled = node.pq_signature_schemes_enabled and true or false,
-					dynamic_record_sizing_disabled = node.dynamic_record_sizing_disabled and true or false
+					config = node.ech_config and split(node.ech_config:gsub("\\n", "\n"), "\n") or {}
 				},
 				utls = {
 					enabled = (node.utls == "1" or node.reality == "1") and true or false,
@@ -289,17 +287,6 @@ function gen_outbound(flag, node, tag, proxy_table)
 			}
 		end
 
-		if node.protocol == "shadowsocksr" then
-			protocol_table = {
-				method = node.method or nil,
-				password = node.password or "",
-				obfs = node.ssr_obfs,
-				obfs_param = node.ssr_obfs_param,
-				protocol = node.ssr_protocol,
-				protocol_param = node.ssr_protocol_param,
-			}
-		end
-
 		if node.protocol == "trojan" then
 			protocol_table = {
 				password = node.password,
@@ -391,9 +378,7 @@ function gen_outbound(flag, node, tag, proxy_table)
 					} or nil,
 					ech = {
 						enabled = (node.ech == "1") and true or false,
-						config = node.ech_config and split(node.ech_config:gsub("\\n", "\n"), "\n") or {},
-						pq_signature_schemes_enabled = node.pq_signature_schemes_enabled and true or false,
-						dynamic_record_sizing_disabled = node.dynamic_record_sizing_disabled and true or false
+						config = node.ech_config and split(node.ech_config:gsub("\\n", "\n"), "\n") or {}
 					}
 				}
 			}
@@ -425,9 +410,7 @@ function gen_outbound(flag, node, tag, proxy_table)
 					} or nil,
 					ech = {
 						enabled = (node.ech == "1") and true or false,
-						config = node.ech_config and split(node.ech_config:gsub("\\n", "\n"), "\n") or {},
-						pq_signature_schemes_enabled = node.pq_signature_schemes_enabled and true or false,
-						dynamic_record_sizing_disabled = node.dynamic_record_sizing_disabled and true or false
+						config = node.ech_config and split(node.ech_config:gsub("\\n", "\n"), "\n") or {}
 					}
 				}
 			}
@@ -459,9 +442,7 @@ function gen_outbound(flag, node, tag, proxy_table)
 					insecure = (node.tls_allowInsecure == "1") and true or false,
 					ech = {
 						enabled = (node.ech == "1") and true or false,
-						config = node.ech_config and split(node.ech_config:gsub("\\n", "\n"), "\n") or {},
-						pq_signature_schemes_enabled = node.pq_signature_schemes_enabled and true or false,
-						dynamic_record_sizing_disabled = node.dynamic_record_sizing_disabled and true or false
+						config = node.ech_config and split(node.ech_config:gsub("\\n", "\n"), "\n") or {}
 					}
 				}
 			}
@@ -518,9 +499,7 @@ function gen_config_server(node)
 	if node.tls == "1" and node.ech == "1" then
 		tls.ech = {
 			enabled = true,
-			key = node.ech_key and split(node.ech_key:gsub("\\n", "\n"), "\n") or {},
-			pq_signature_schemes_enabled = (node.pq_signature_schemes_enabled == "1") and true or false,
-			dynamic_record_sizing_disabled = (node.dynamic_record_sizing_disabled == "1") and true or false,
+			key = node.ech_key and split(node.ech_key:gsub("\\n", "\n"), "\n") or {}
 		}
 	end
 
@@ -1051,9 +1030,9 @@ function gen_config(var)
 				tag = urltest_tag,
 				outbounds = valid_nodes,
 				url = _node.urltest_url or "https://www.gstatic.com/generate_204",
-				interval = _node.urltest_interval and tonumber(_node.urltest_interval) and string.format("%dm", tonumber(_node.urltest_interval) / 60) or "3m",
-				tolerance = _node.urltest_tolerance and tonumber(_node.urltest_tolerance) and tonumber(_node.urltest_tolerance) or 50,
-				idle_timeout = _node.urltest_idle_timeout and tonumber(_node.urltest_idle_timeout) and string.format("%dm", tonumber(_node.urltest_idle_timeout) / 60) or "30m",
+				interval = (api.format_go_time(_node.urltest_interval) ~= "0s") and api.format_go_time(_node.urltest_interval) or "3m",
+				tolerance = (_node.urltest_tolerance and tonumber(_node.urltest_tolerance) > 0) and tonumber(_node.urltest_tolerance) or 50,
+				idle_timeout = (api.format_go_time(_node.urltest_idle_timeout) ~= "0s") and api.format_go_time(_node.urltest_idle_timeout) or "30m",
 				interrupt_exist_connections = (_node.urltest_interrupt_exist_connections == "true" or _node.urltest_interrupt_exist_connections == "1") and true or false
 			}
 			table.insert(outbounds, outbound)
@@ -1700,7 +1679,8 @@ function gen_config(var)
 			if remote_dns_fake then
 				table.insert(dns.rules, {
 					query_type = { "A", "AAAA" },
-					server = fakedns_tag
+					server = fakedns_tag,
+					disable_cache = true
 				})
 			end
 		end
