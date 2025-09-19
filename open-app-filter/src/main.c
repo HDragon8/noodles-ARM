@@ -47,6 +47,7 @@ int g_oaf_config_change = 1;
 af_config_t g_af_config;
 int g_hnat_init = 0;
 int g_feature_update = 0;
+int g_feature_update_time = 0;
 void dev_list_timeout_handler(struct uloop_timeout *t);
 
 void af_init_time_status(void){
@@ -203,7 +204,8 @@ void update_oaf_proc_value(char *key, char *value){
     char old_value[128] = {0};
     sprintf(file_path, "/proc/sys/oaf/%s", key);
 
-    af_read_file_value(file_path, old_value, sizeof(old_value));    
+    if (af_read_file_value(file_path, old_value, sizeof(old_value)) == -1)
+        return;
     if (strcmp(old_value, value) != 0){
         sprintf(cmd_buf, "echo %s >/proc/sys/oaf/%s", value, key);
         system(cmd_buf);
@@ -349,25 +351,12 @@ void update_oaf_status(void){
     int cur_enable = 0;
     if(g_af_config.global.enable == 1){
 		ret = af_check_time(&g_af_config.time);
-		if (ret == 1){
-			system("echo 1 >/proc/sys/oaf/enable");
-		}
-		else{
-			system("echo 0 >/proc/sys/oaf/enable");
-		}
 	}
-	else{
-		system("echo 0 >/proc/sys/oaf/enable");
-	}
+    update_oaf_proc_value("enable", ret==1?"1":"0");
 }
 
 void update_oaf_record_status(void){
-    if(g_af_config.global.record_enable == 1){
-        system("echo 1 >/proc/sys/oaf/record_enable");
-    }
-    else{
-        system("echo 0 >/proc/sys/oaf/record_enable");
-    }
+    update_oaf_proc_value("record_enable", g_af_config.global.record_enable==1?"1":"0");
 }
 
 void af_hnat_init(void){
@@ -446,9 +435,30 @@ int reload_feature(void){
         LOG_ERROR("Failed to load feature to kernel\n");
         return -1;
     }
+    clean_invalid_app_records();
+    clear_device_app_statistics();
     LOG_WARN("reload feature success\n");
+    g_feature_update_time = get_timestamp();
     return 0;
 }
+
+
+void check_date_change(void)
+{
+    static int last_day = -1;
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+    int current_day = tm_info->tm_mday;
+    if (last_day != current_day )
+    {
+        LOG_WARN("day changed: %d -> %d\n",last_day, current_day);
+        if (last_day != -1){
+            clear_device_app_statistics();
+        }
+        last_day = current_day;
+    }
+}
+
 
 void dev_list_timeout_handler(struct uloop_timeout *t)
 {
@@ -465,6 +475,7 @@ void dev_list_timeout_handler(struct uloop_timeout *t)
         }
         flush_expire_visit_info();
         update_oaf_status();
+		check_date_change();
         dump_dev_list();
     }
     if (g_oaf_config_change == 1){
@@ -479,7 +490,7 @@ void dev_list_timeout_handler(struct uloop_timeout *t)
     }
 
 
-    if (appfilter_nl_fd.fd < 0){
+    if (appfilter_nl_fd.fd < 0 && access("/proc/sys/oaf", F_OK) == 0){
         appfilter_nl_fd.fd = appfilter_nl_init();
         if (appfilter_nl_fd.fd > 0){
             uloop_fd_add(&appfilter_nl_fd, ULOOP_READ);

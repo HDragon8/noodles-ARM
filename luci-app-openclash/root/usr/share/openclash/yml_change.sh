@@ -1,22 +1,21 @@
 #!/bin/sh
 . /usr/share/openclash/ruby.sh
 . /usr/share/openclash/log.sh
+. /usr/share/openclash/uci.sh
 . /lib/functions.sh
 
 LOG_FILE="/tmp/openclash.log"
 CONFIG_FILE="$5"
 
-config_load openclash
-
-config_get custom_fakeip_filter "config" "custom_fakeip_filter" 0
-config_get custom_name_policy "config" "custom_name_policy" 0
-config_get custom_host "config" "custom_host" 0
-config_get enable_custom_dns "config" "enable_custom_dns" 0
-config_get append_wan_dns "config" "append_wan_dns" 0
-config_get custom_fallback_filter "config" "custom_fallback_filter" 0
-config_get china_ip_route "config" "china_ip_route" 0
-config_get china_ip6_route "config" "china_ip6_route" 0
-config_get enable_redirect_dns "config" "enable_redirect_dns" 1
+custom_fakeip_filter=$(uci_get_config "custom_fakeip_filter" || echo 0)
+custom_name_policy=$(uci_get_config "custom_name_policy" || echo 0)
+custom_host=$(uci_get_config "custom_host" || echo 0)
+enable_custom_dns=$(uci_get_config "enable_custom_dns" || echo 0)
+append_wan_dns=$(uci_get_config "append_wan_dns" || echo 0)
+custom_fallback_filter=$(uci_get_config "custom_fallback_filter" || echo 0)
+china_ip_route=$(uci_get_config "china_ip_route" || echo 0)
+china_ip6_route=$(uci_get_config "china_ip6_route" || echo 0)
+enable_redirect_dns=$(uci_get_config "enable_redirect_dns" || echo 1)
 
 [ "$china_ip_route" -ne 0 ] && [ "$china_ip_route" -ne 1 ] && [ "$china_ip_route" -ne 2 ] && china_ip_route=0
 [ "$china_ip6_route" -ne 0 ] && [ "$china_ip6_route" -ne 1 ] && [ "$china_ip6_route" -ne 2 ] && china_ip6_route=0
@@ -345,6 +344,11 @@ geo_custom_url = '${38}'
 geoip_custom_url = '${39}'
 geosite_custom_url = '${40}'
 geoasn_custom_url = '${41}'
+lgbm_auto_update = '${42}' == '1'
+lgbm_custom_url = '${43}'
+lgbm_update_interval = '${44}'
+smart_collect = '${45}' == '1'
+smart_collect_size = '${46}'
 
 enable_custom_dns = '$enable_custom_dns' == '1'
 append_wan_dns = '$append_wan_dns' == '1'
@@ -386,10 +390,21 @@ threads << Thread.new do
       Value['unified-delay'] = true if unified_delay
       Value['find-process-mode'] = find_process_mode if find_process_mode != '0'
       Value['global-client-fingerprint'] = global_client_fingerprint if global_client_fingerprint != '0'
+      
       (Value['experimental'] ||= {})['quic-go-disable-gso'] = true if quic_gso
       if cors_origin != '0'
          (Value['external-controller-cors'] ||= {})['allow-origins'] = [cors_origin]
          Value['external-controller-cors']['allow-private-network'] = true
+      end
+
+      Value['lgbm-auto-update'] = true if lgbm_auto_update
+      if lgbm_auto_update
+         Value['lgbm-custom-url'] = lgbm_custom_url.strip
+         Value['lgbm-update-interval'] = lgbm_update_interval.to_i
+      end
+
+      if smart_collect
+        (Value['profile'] ||= {})['smart-collector-size'] = smart_collect_size.to_f
       end
 
       Value['geox-url'] ||= {}

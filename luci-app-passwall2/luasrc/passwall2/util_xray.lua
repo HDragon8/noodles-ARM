@@ -24,7 +24,8 @@ local function get_noise_packets()
 		local noise = (n.enabled == "1") and {
 			type = n.type,
 			packet = n.packet,
-			delay = string.find(n.delay, "-") and n.delay or tonumber(n.delay)
+			delay = string.find(n.delay, "-") and n.delay or tonumber(n.delay),
+			applyTo = n.applyTo
 		} or nil
 		table.insert(noises, noise)
 	end)
@@ -154,14 +155,17 @@ function gen_outbound(flag, node, tag, proxy_table)
 				tlsSettings = (node.stream_security == "tls") and {
 					serverName = node.tls_serverName,
 					allowInsecure = (node.tls_allowInsecure == "1") and true or false,
-					fingerprint = (node.type == "Xray" and node.utls == "1" and node.fingerprint and node.fingerprint ~= "") and node.fingerprint or nil
+					fingerprint = (node.type == "Xray" and node.utls == "1" and node.fingerprint and node.fingerprint ~= "") and node.fingerprint or nil,
+					echConfigList = (node.ech == "1") and node.ech_config or nil,
+					echForceQuery = (node.ech == "1") and (node.ech_ForceQuery or "none") or nil
 				} or nil,
 				realitySettings = (node.stream_security == "reality") and {
 					serverName = node.tls_serverName,
 					publicKey = node.reality_publicKey,
 					shortId = node.reality_shortId or "",
 					spiderX = node.reality_spiderX or "/",
-					fingerprint = (node.type == "Xray" and node.fingerprint and node.fingerprint ~= "") and node.fingerprint or "chrome"
+					fingerprint = (node.type == "Xray" and node.fingerprint and node.fingerprint ~= "") and node.fingerprint or "chrome",
+					mldsa65Verify = (node.use_mldsa65Verify == "1") and node.reality_mldsa65Verify or nil
 				} or nil,
 				rawSettings = ((node.transport == "raw" or node.transport == "tcp") and node.protocol ~= "socks" and (node.tcp_guise and node.tcp_guise ~= "none")) and {
 					header = {
@@ -240,7 +244,7 @@ function gen_outbound(flag, node, tag, proxy_table)
 								level = 0,
 								security = (node.protocol == "vmess") and node.security or nil,
 								encryption = node.encryption or "none",
-								flow = (node.protocol == "vless" and node.tls == "1" and (node.transport == "raw" or node.transport == "tcp") and node.flow and node.flow ~= "") and node.flow or nil
+								flow = (node.protocol == "vless" and node.tls == "1" and (node.transport == "raw" or node.transport == "tcp" or node.transport == "xhttp") and node.flow and node.flow ~= "") and node.flow or nil
 
 							}
 						}
@@ -312,7 +316,7 @@ function gen_config_server(node)
 			for i = 1, #node.uuid do
 				clients[i] = {
 					id = node.uuid[i],
-					flow = ("vless" == node.protocol and "1" == node.tls and "raw" == node.transport and node.flow and node.flow ~= "") and node.flow or nil
+					flow = (node.protocol == "vless" and node.tls == "1" and (node.transport == "raw" or node.transport == "xhttp") and node.flow and node.flow ~= "") and node.flow or nil
 				}
 			end
 			settings = {
@@ -460,7 +464,8 @@ function gen_config_server(node)
 								certificateFile = node.tls_certificateFile,
 								keyFile = node.tls_keyFile
 							}
-						}
+						},
+						echServerKeys = (node.ech == "1") and node.ech_key or nil
 					} or nil,
 					rawSettings = (node.transport == "raw" or node.transport == "tcp") and {
 						header = {
@@ -545,7 +550,8 @@ function gen_config_server(node)
 				dest = node.reality_dest,
 				serverNames = node.reality_serverNames or {},
 				privateKey = node.reality_private_key,
-				shortIds = node.reality_shortId or ""
+				shortIds = node.reality_shortId or "",
+				mldsa65Seed = (node.use_mldsa65Seed == "1") and node.reality_mldsa65Seed or nil
 			} or nil
 		end
 	end
@@ -766,6 +772,10 @@ function gen_config(var)
 						outbound.tag = outbound.tag .. ":" .. fallback_node.remarks
 						table.insert(outbounds, outbound)
 						fallback_node_tag = outbound.tag
+					end
+				else
+					if gen_balancer(fallback_node) then
+						fallback_node_tag = fallback_node_id
 					end
 				end
 			end
@@ -1056,6 +1066,7 @@ function gen_config(var)
 						domains = {}
 						string.gsub(e.domain_list, '[^' .. "\r\n" .. ']+', function(w)
 							if w:find("#") == 1 then return end
+							if w:find("rule-set:", 1, true) == 1 or w:find("rs:") == 1 then return end
 							table.insert(domains, w)
 							table.insert(domain_table.domain, w)
 						end)
@@ -1069,6 +1080,7 @@ function gen_config(var)
 						ip = {}
 						string.gsub(e.ip_list, '[^' .. "\r\n" .. ']+', function(w)
 							if w:find("#") == 1 then return end
+							if w:find("rule-set:", 1, true) == 1 or w:find("rs:") == 1 then return end
 							table.insert(ip, w)
 						end)
 						if #ip == 0 then ip = nil end
@@ -1152,7 +1164,7 @@ function gen_config(var)
 				sys.call(string.format("mkdir -p %s && touch %s/%s", api.TMP_IFACE_PATH, api.TMP_IFACE_PATH, node.iface))
 			end
 		else
-			local outbound = gen_outbound(flag, node, nil, { fragment = xray_settings.fragment == "1" or nil, noise = xray_settings.fragment == "1" or nil, run_socks_instance = not no_run })
+			local outbound = gen_outbound(flag, node, nil, { fragment = xray_settings.fragment == "1" or nil, noise = xray_settings.noise == "1" or nil, run_socks_instance = not no_run })
 			if outbound then
 				outbound.tag = outbound.tag .. ":" .. node.remarks
 				COMMON.default_outbound_tag, last_insert_outbound = set_outbound_detour(node, outbound, outbounds)
@@ -1555,7 +1567,8 @@ function gen_config(var)
 					fragment = (xray_settings.fragment == "1") and {
 						packets = (xray_settings.fragment_packets and xray_settings.fragment_packets ~= "") and xray_settings.fragment_packets,
 						length = (xray_settings.fragment_length and xray_settings.fragment_length ~= "") and xray_settings.fragment_length,
-						interval = (xray_settings.fragment_interval and xray_settings.fragment_interval ~= "") and xray_settings.fragment_interval
+						interval = (xray_settings.fragment_interval and xray_settings.fragment_interval ~= "") and xray_settings.fragment_interval,
+						maxSplit = (xray_settings.fragment_maxSplit and xray_settings.fragment_maxSplit ~= "") and xray_settings.fragment_maxSplit
 					} or nil,
 					noises = (xray_settings.noise == "1") and get_noise_packets() or nil
 				},
