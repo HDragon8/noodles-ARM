@@ -1,7 +1,7 @@
 <% if luci.sys.exec("echo -n `uci -q get base_config.@status[0].links`") ~= "0" then %>
 <script>
 		var links = document.createElement('div');
-		links.innerHTML ='<div class="table"><div class="tr"><div class="td left" width="33%"><a style="color:#5e72e4">固件编译者</a></div><div class="td left"><a href="https://github.com/HDragon8/istore-noodles" target="_blank" style="color:orangered">侯永华 @ 甲辰龍年 农历六月初三 夏 *2024.7.10*</a></div></div><div>';
+		links.innerHTML ='<div class="table"><div class="tr"><div class="td left" width="33%"><a style="color:#5e72e4">固件编译者</a></div><div class="td left"><a href="https://github.com/HDragon8/OpenWrt" target="_blank" style="color:orangered">侯永华 @ 乙巳蛇🐍年 农历十月十六 *🎉2025.12.05🎊* ❄️大雪☃️</a></div></div><div>';
 		setTimeout(function(){
 		var telegram = document.querySelectorAll(".cbi-section")[0];
 		telegram.appendChild(links);

@@ -41,13 +41,13 @@ endef
 
 define Package/A-default-settings/install
 	$(CP) ./files/* $(1)/
-	echo $(BOARD)$(TARGETID)
-	if [ -d ./target/$(BOARD)/base-files/. ]; then \
-		$(CP) ./target/$(BOARD)/base-files/* $(1)/; \
-	fi
-	if [ -d ./target/$(TARGETID)/base-files/. ]; then \
-		$(CP) ./target/$(TARGETID)/base-files/* $(1)/; \
-	fi;
+#	echo $(BOARD)$(TARGETID)
+#	if [ -d ./target/$(BOARD)/base-files/. ]; then \
+#		$(CP) ./target/$(BOARD)/base-files/* $(1)/; \
+#	fi
+#	if [ -d ./target/$(TARGETID)/base-files/. ]; then \
+#		$(CP) ./target/$(TARGETID)/base-files/* $(1)/; \
+#	fi;
 endef
 
 #define Package/A-default-settings-chn/install
