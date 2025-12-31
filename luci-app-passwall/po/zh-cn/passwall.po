@@ -886,6 +886,9 @@ msgstr "节点"
 msgid "Node Address"
 msgstr "节点地址"
 
+msgid "Node address cannot be empty."
+msgstr "节点地址不能为空。"
+
 msgid "Node Port"
 msgstr "节点端口"
 
@@ -1121,7 +1124,7 @@ msgid "Are you sure you want to delete all subscribed nodes?"
 msgstr "您确定要删除所有已订阅的节点吗？"
 
 msgid "Manual subscription All"
-msgstr "手动订阅全部"
+msgstr "手动订阅全部链接"
 
 msgid "This remark already exists, please change a new remark."
 msgstr "此备注已存在，请改一个新的备注。"
@@ -1290,6 +1293,12 @@ msgstr "本地端口"
 
 msgid "Fast Open"
 msgstr "快速打开"
+
+msgid "Pre-connections"
+msgstr "预连接"
+
+msgid "Number of early established connections to reduce latency."
+msgstr "预连接的数量，用于降低延迟。"
 
 msgid "Need node support required"
 msgstr "需要节点支持"

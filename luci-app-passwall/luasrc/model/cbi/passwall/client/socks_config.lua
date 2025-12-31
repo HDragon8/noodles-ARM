@@ -10,9 +10,7 @@ if not arg[1] or not m:get(arg[1]) then
 end
 
 m:append(Template(appname .. "/cbi/nodes_multivalue_com"))
-if api.is_js_luci() then
-	m:append(Template(appname .. "/cbi/nodes_listvalue_com"))
-end
+m:append(Template(appname .. "/cbi/nodes_listvalue_com"))
 
 local has_singbox = api.finded_com("sing-box")
 local has_xray = api.finded_com("xray")
@@ -50,9 +48,7 @@ socks_node = s:option(ListValue, "node", translate("Node"))
 if auto_switch_tip then
 	socks_node.description = auto_switch_tip
 end
-if api.is_js_luci() then
-	socks_node.template = appname .. "/cbi/nodes_listvalue"
-end
+socks_node.template = appname .. "/cbi/nodes_listvalue"
 socks_node.group = {}
 
 o = s:option(Flag, "bind_local", translate("Bind Local"), translate("When selected, it can only be accessed localhost."))
@@ -113,20 +109,27 @@ for i, v in pairs(nodes_table) do
 end
 -- 读取旧 DynamicList
 function o.cfgvalue(self, section)
-	local val = m.uci:get_list(appname, section, "autoswitch_backup_node")
-	if val then
-		return val
-	else
-		return {}
-	end
+	return m.uci:get_list(appname, section, "autoswitch_backup_node") or {}
 end
 -- 写入保持 DynamicList
 function o.write(self, section, value)
-	local result = {}
+	local old = m.uci:get_list(appname, section, "autoswitch_backup_node") or {}
+	local new, set = {}, {}
 	for v in value:gmatch("%S+") do
-		result[#result + 1] = v
+		new[#new + 1] = v
+		set[v] = 1
 	end
-	m.uci:set_list(appname, section, "autoswitch_backup_node", result)
+	for _, v in ipairs(old) do
+		if not set[v] then
+			m.uci:set_list(appname, section, "autoswitch_backup_node", new)
+			return
+		end
+		set[v] = nil
+	end
+	for _ in pairs(set) do
+		m.uci:set_list(appname, section, "autoswitch_backup_node", new)
+		return
+	end
 end
 
 o = s:option(Flag, "autoswitch_restore_switch", translate("Restore Switch"), translate("When detects main node is available, switch back to the main node."))
