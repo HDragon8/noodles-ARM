@@ -17,6 +17,8 @@ mv -n `find $1/* -maxdepth 0 -type d` ./
 rm -rf $1
 }
 git clone --depth 1 https://github.com/HDragon8/A-default-settings A-default-settings
+git clone --depth 1 https://github.com/timsaya/luci-app-bandix bandix && mv -n bandix/luci-app-bandix ./;rm -rf bandix
+git clone --depth 1 https://github.com/timsaya/openwrt-bandix
 git clone --depth 1 https://github.com/kiddin9/luci-theme-edge
 git clone --depth 1 https://github.com/xiaorouji/openwrt-passwall-packages && mvdir openwrt-passwall-packages
 git clone --depth 1 https://github.com/fw876/helloworld && mvdir helloworld
