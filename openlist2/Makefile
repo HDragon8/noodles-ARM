@@ -7,13 +7,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=openlist2
-PKG_VERSION:=4.1.8
-PKG_WEB_VERSION:=4.1.8
+PKG_VERSION:=4.1.10
+PKG_WEB_VERSION:=4.1.10
 PKG_RELEASE:=1
 
 PKG_SOURCE:=openlist-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/OpenListTeam/OpenList/tar.gz/v$(PKG_VERSION)?
-PKG_HASH:=8ba861db0ad29e60fcfb4544ff3744dfa235ab1744ea0c998e1c6f80a630996d
+PKG_HASH:=0e85b2e9f97c819a79a054c2de1f505b0b0d78e1c8ce6783e12da85ea519840c
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/OpenList-$(PKG_VERSION)
 
@@ -24,7 +24,7 @@ PKG_MAINTAINER:=sbwml <admin@cooluc.com>
 define Download/openlist-frontend
   FILE:=openlist-frontend-dist-lite-v$(PKG_WEB_VERSION).tar.gz
   URL:=https://github.com/OpenListTeam/OpenList-Frontend/releases/download/v$(PKG_WEB_VERSION)/
-  HASH:=00c8cf73fa98ba3ff56de9a8fd02d545ef87236170e03ca6f9a76c04d4cf957e
+  HASH:=e662f28dfac4631d5cae242f30d2f2f4c16a424399e7850fd5309127c82e1a60
 endef
 
 PKG_BUILD_DEPENDS:=golang/host

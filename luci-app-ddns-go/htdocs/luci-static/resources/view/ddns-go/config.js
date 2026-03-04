@@ -1,4 +1,4 @@
-/*   Copyright (C) 2021-2025 sirpdboy herboy2008@gmail.com https://github.com/sirpdboy/luci-app-ddns-go */
+/*   Copyright (C) 2021-2026 sirpdboy herboy2008@gmail.com https://github.com/sirpdboy/luci-app-ddns-go */
 'use strict';
 'require view';
 'require fs';
@@ -113,29 +113,30 @@ return view.extend({
             uci.load('ddns-go')
         ]);
     },
-
     handleResetPassword: async function () {
     try {
         ui.showModal(_('Resetting Password'), [
-            E('p', { 'class': 'spinning' }, _('Resetting admin password, please wait...'))
+            E('p', { 'class': 'spinning' }, _('Resetting admin username and password, please wait...'))
         ]);
-
         const result = await fs.exec('/usr/bin/ddns-go', ['-resetPassword', 'admin12345', '-c', '/etc/ddns-go/ddns-go-config.yaml']);
+        const configFile = '/etc/ddns-go/ddns-go-config.yaml';
+        const readResult = await fs.read(configFile);
+        if (readResult && readResult.trim() !== '') {
+            let configContent = readResult;
+            configContent = configContent.replace(/(username:\s*).*/g, '$1admin');
+            
+            if (!configContent.includes('user:')) {
+                configContent += '\nuser:\n    username: admin\n    password: $2a$10$G1xO1cVUYtSpPYwV/Jk3l.u7PxLUxo03wntWG6VA9BxAftNWfZEhK';
+            }
+            
+            await fs.write(configFile, configContent);
+        }
 
         ui.hideModal();
 
-        const output = (result.stdout + result.stderr).trim();
-
-        let success = false;
-        let message = '';
-
         if (result.code === 0) {
-            
-
-                message = _('Password reset successfully to admin12345');
-
-            ui.showModal(_('Password Reset Successful'), [
-                E('p', _('Admin password has been reset to: admin12345')),
+            ui.showModal(_('Username and Password Reset Successful'), [
+                E('p', _('Username: admin, Password: admin12345')),
                 E('p', _('You need to restart DDNS-Go service for the changes to take effect.')),
                 E('div', { 'class': 'right' }, [
                     E('button', {
@@ -153,15 +154,33 @@ return view.extend({
                 ])
             ]);
         } else {
-            alert(_('Reset may have failed:') + '\n' + output);
+            ui.showModal(_('Partial Reset'), [
+                E('p', _('DDNS-Go command reset may have failed, but configuration file has been updated.')),
+                E('p', _('Username: admin, Password: admin12345')),
+                E('p', _('You may need to restart DDNS-Go service manually.')),
+                E('div', { 'class': 'right' }, [
+                    E('button', {
+                        'class': 'btn cbi-button cbi-button-positive',
+                        'click': ui.createHandlerFn(this, function() {
+                            ui.hideModal();
+                            this.handleRestartService();
+                        })
+                    }, _('Restart Service Now')),
+                    ' ',
+                    E('button', {
+                        'class': 'btn cbi-button cbi-button-neutral',
+                        'click': ui.hideModal
+                    }, _('Close'))
+                ])
+            ]);
         }
         
     } catch (error) {
         ui.hideModal();
-        console.error('Reset password failed:', error);
-        alert(_('ERROR:') + '\n' + _('Reset password failed:') + '\n' + error.message);
+        //console.error('Reset username/password failed:', error);
+        alert(_('ERROR:') + '\n' + _('Resetusername/ password failed:') + '\n' + error.message);
     }
-    },
+},
  
     handleRestartService: async function() {
     try {
@@ -308,12 +327,17 @@ return view.extend({
 
         o = s.option(form.Value, 'delay', _('Delayed Start (seconds)'));
         o.default = '60';
-        
+	
         o = s.option(form.Button, '_newpassword', _('Reset account password'));
-        o.inputtitle = _('ResetPassword');
+        o.inputtitle = _('Reset');
         o.inputstyle = 'apply';
         o.onclick = L.bind(this.handleResetPassword, this, data);
-        
+
+        o = s.option(form.Button, '_update', _('Update kernel'));
+        o.inputtitle = _('Check Update');
+        o.inputstyle = 'apply';
+        o.onclick = L.bind(this.handleUpdate, this, data);
+
         o = s.option(form.DummyValue, '_update_status', _('Current Version'));
         o.rawhtml = true;
         var currentVersion = '';
@@ -332,12 +356,6 @@ return view.extend({
                     currentVersion ? String.format('v%s', currentVersion) : _('Loading...'))
             ]);
         };
-
-        o = s.option(form.Button, '_update', _('Update kernel'),
-                _('Check and update DDNS-Go to the latest version'));
-        o.inputtitle = _('Check Update');
-        o.inputstyle = 'apply';
-        o.onclick = L.bind(this.handleUpdate, this, data);
         
         return m.render();
     }
