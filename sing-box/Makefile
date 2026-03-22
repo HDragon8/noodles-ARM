@@ -5,12 +5,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sing-box
-PKG_VERSION:=1.13.0
+PKG_VERSION:=1.13.3
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/SagerNet/sing-box/tar.gz/v$(PKG_VERSION)?
-PKG_HASH:=6ddc71596dc937873c5aba15a4f2b395c5434265efdc1bd21f4c03d8c5b7f641
+PKG_HASH:=bf8933cd43e2797afcffb47528282e1c1aee078bf5eeda888d80a151fef726e1
 
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=LICENSE
@@ -27,7 +27,8 @@ PKG_CONFIG_DEPENDS:= \
 	CONFIG_SING_BOX_BUILD_TAILSCALE \
 	CONFIG_SING_BOX_BUILD_UTLS \
 	CONFIG_SING_BOX_BUILD_V2RAY_API \
-	CONFIG_SING_BOX_BUILD_WIREGUARD
+	CONFIG_SING_BOX_BUILD_WIREGUARD \
+	CONFIG_SING_BOX_BUILD_NAIVE_OUTBOUND
 
 PKG_BUILD_DEPENDS:=golang/host
 PKG_BUILD_PARALLEL:=1
@@ -56,7 +57,7 @@ endef
 
 define Package/sing-box/description
   Sing-box is a universal proxy platform which supports hysteria, SOCKS, Shadowsocks,
-  ShadowTLS, Tor, trojan, VLess, VMess, WireGuard and so on.
+  ShadowTLS, Tor, trojan, VLess, VMess, WireGuard, AnyTLS, NaiveProxy outbound and so on.
 endef
 
 define Package/sing-box/config
@@ -106,6 +107,11 @@ define Package/sing-box/config
     config SING_BOX_BUILD_WIREGUARD
     bool "Build with WireGuard support"
     default y
+
+    config SING_BOX_BUILD_NAIVE_OUTBOUND
+    bool "Build with NaiveProxy outbound support"
+    depends on SING_BOX_BUILD_QUIC
+    default y
   endif
 endef
 
@@ -121,6 +127,7 @@ GO_PKG_TAGS:=$(subst $(space),$(comma),$(strip \
 	$(if $(CONFIG_SING_BOX_BUILD_UTLS),with_utls) \
 	$(if $(CONFIG_SING_BOX_BUILD_V2RAY_API),with_v2ray_api) \
 	$(if $(CONFIG_SING_BOX_BUILD_WIREGUARD),with_wireguard) \
+	$(if $(CONFIG_SING_BOX_BUILD_NAIVE_OUTBOUND),with_naive_outbound) \
 ))
 
 define Package/sing-box/conffiles
