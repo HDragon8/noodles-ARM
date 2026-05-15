@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bandix
-PKG_VERSION:=0.12.7
+PKG_VERSION:=0.12.9
 PKG_RELEASE:=1
 
 PKG_LICENSE:=Apache-2.0
@@ -13,7 +13,7 @@ include $(INCLUDE_DIR)/package.mk
 include $(TOPDIR)/feeds/packages/lang/rust/rust-values.mk
 
 # 二进制文件的文件名和URL
-RUST_BANDIX_VERSION:=0.12.7
+RUST_BANDIX_VERSION:=0.12.9
 RUST_BINARY_FILENAME:=bandix-$(RUST_BANDIX_VERSION)-$(RUSTC_TARGET_ARCH).tar.gz
 
 
@@ -23,7 +23,7 @@ PKG_SOURCE_URL:=https://github.com/timsaya/bandix/releases/download/v$(RUST_BAND
 
 # 修正二进制文件校验值
 ifeq ($(ARCH),aarch64)
-	PKG_HASH:=ef9af01841a9bb421b14226c1de360d3d8c4a79529b7e5c69ea04219b5ef47bd
+	PKG_HASH:=678904e611de5042ae40827fb706c44ebb1760c8f2910b1cbf84535ac3a1eab6
 else ifeq ($(ARCH),arm) # update.sh skip this tag, do not delete this comment
 	# Ref https://github.com/openwrt/packages/blob/master/lang/rust/rust-values.mk
 
@@ -39,28 +39,28 @@ else ifeq ($(ARCH),arm) # update.sh skip this tag, do not delete this comment
 	endif
 
 	ifeq ($(ARM_CPU_TYPE),arm-armel)
-		PKG_HASH:=f12a38c414c1a5e41aebd6730ea99a258de8f730770b2e90801759606897dab5
+		PKG_HASH:=55e30654312c8fd36ddaaffc6573665dc8e366554b9f79110a1b5c1d57604987
 	else ifeq ($(ARM_CPU_TYPE),arm-armhf)
-		PKG_HASH:=da9e3b0be1fed5f89c1c0984f0391e25f12761824ba8a7891c57eee07817c140
+		PKG_HASH:=5e77b8b02f7bd1334a5092c33246659c49f7e38abce15715f17aec0ff1a36b21
 	else ifeq ($(ARM_CPU_TYPE),armv5te-armel)
-		PKG_HASH:=a0365bf3ea6292d8f6bc3c1a451588cc803ef8dc3827a416c7a23f5b7215ff5c
+		PKG_HASH:=03beab578408677e1126832afd8504505400e531dcefc747f683056ebe52200c
 	else ifeq ($(ARM_CPU_TYPE),armv7-armel)
-		PKG_HASH:=ca645ce8239d63865df9a6562d10ec103df6d8a2d9f7d88cf39573f1143db35b
+		PKG_HASH:=1359e2ae29db29ad95837a2dd849b2b44e3ddddca3551cc5fc0184cf4fad734e
 	else ifeq ($(ARM_CPU_TYPE),armv7-armhf)
-		PKG_HASH:=6c93d197a8df40514983a983fb950dd641122426ed2bca0999e849d917df821b
+		PKG_HASH:=7932815934816eab792378b2bce7a57b6cea6d8d37e997c2b578dea1ca559456
 	else
 		PKG_HASH:=dummy
 	endif
 else ifeq ($(ARCH),mips)
-	PKG_HASH:=dc93ec02f94ddc35e1e6fe0e108f0883526b4c54331c26a1f27c20a8f37957ec
+	PKG_HASH:=029bc1f6c936e7bfc8a686aaa56d1f9068613295d12401a662eafadb040d115b
 else ifeq ($(ARCH),mipsel)
-	PKG_HASH:=6d60527faade80023e8b8d7ad9c61774fc2143243f64569882dab1b76b5c2c15
+	PKG_HASH:=8026a6c5534aac0fe33482de670abba968ec9bcf84a5f20d11e174365baad46d
 else ifeq ($(ARCH),powerpc64)
-	PKG_HASH:=9c3dc4bde05e1f7a3a7a7a63ee5119195f5172bdf6e6e7879a02a0f10c75cfbc
+	PKG_HASH:=9159e10f1df1fbff34d2353caf525decf8e7a95264007cbb4551e7bac63ed57c
 else ifeq ($(ARCH),riscv64)
-	PKG_HASH:=f1310e49a9e9239c0dbd377efa6c8e29221016e34890493f91b402d81760b6a1
+	PKG_HASH:=0dd77e1581c24285af610116f1a15527f766b796e3b6adf42db5a8645f72c4a1
 else ifeq ($(ARCH),x86_64)
-	PKG_HASH:=9cd5dd6b5af5d40db6477f38502eaa5662e2a0d003883b3ae6733063948864fd
+	PKG_HASH:=e5746912b4b175e56c5f80d8db4065a6d92236f8c9fc9e831a65224b1daaba31
 else
 	PKG_HASH:=dummy
 endif
