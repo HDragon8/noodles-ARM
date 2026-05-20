@@ -37,6 +37,7 @@ git clone --depth 1 https://github.com/destan19/OpenAppFilter
 git clone --depth 1 https://github.com/jerrykuku/lua-maxminddb
 git clone --depth 1 https://github.com/LGA1150/openwrt-sysuh3c
 git clone --depth 1 https://github.com/timsaya/luci-app-bandix bandix && mv -n bandix/luci-app-bandix ./;rm -rf bandix
+git clone --depth 1 https://github.com/timsaya/openwrt-bandix
 
 rm -rf v2ray-geodata
 rm -rf mosdns && rm -rf luci-app-mosdns
