@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [24.10]
+        target: [OP24]
 
     steps:
     - name: Checkout
