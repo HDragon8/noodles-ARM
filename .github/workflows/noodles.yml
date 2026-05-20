@@ -3,8 +3,8 @@ name: Sync packages
 on:
   push:
     paths:
-      - '.github/workflows/noodles-ARM.yml'
-      - '.github/diy/24.10.sh'
+      - '.github/workflows/noodles.yml'
+      - '.github/diy/OP24.sh'
 #  schedule:
 #    - cron: 0 */4 * * *
   repository_dispatch:
