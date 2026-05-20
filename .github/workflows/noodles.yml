@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/noodles.yml'
-      - '.github/diy/24.10.sh'
+      - '.github/diy/main.sh'
 #  schedule:
 #    - cron: 0 */4 * * *
   repository_dispatch:
@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [24.10]
+        target: [main]
 
     steps:
     - name: Checkout
