@@ -42,7 +42,7 @@ git clone --depth 1 https://github.com/timsaya/openwrt-bandix
 rm -rf v2ray-geodata
 rm -rf mosdns && rm -rf luci-app-mosdns
 git clone --depth 1 -b v5 https://github.com/sbwml/luci-app-mosdns openwrt-mos && mv -n openwrt-mos/{*mosdns,v2dat} ./; rm -rf openwrt-mos
-git clone --depth 1 https://github.com/sbwml/v2ray-geodata
+# git clone --depth 1 https://github.com/sbwml/v2ray-geodata
 
 # git clone --depth 1 https://github.com/pymumu/luci-app-smartdns
 # git clone --depth 1 https://github.com/lisaac/luci-app-dockerman dockerman && mv -n dockerman/applications/* ./; rm -rf dockerman
