@@ -44,6 +44,11 @@ rm -rf mosdns && rm -rf luci-app-mosdns
 git clone --depth 1 -b v5 https://github.com/sbwml/luci-app-mosdns openwrt-mos && mv -n openwrt-mos/{*mosdns,v2dat} ./; rm -rf openwrt-mos
 # git clone --depth 1 https://github.com/sbwml/v2ray-geodata
 
+#timewol
+git clone --depth 1 https://github.com/Lienol/openwrt-package
+cp -rf ./openwrt-package/luci-app-control-timewol ./luci-app-control-timewol
+rm -rf openwrt-package
+
 # git clone --depth 1 https://github.com/pymumu/luci-app-smartdns
 # git clone --depth 1 https://github.com/lisaac/luci-app-dockerman dockerman && mv -n dockerman/applications/* ./; rm -rf dockerman
 git clone --depth 1 https://github.com/linkease/nas-packages && mv -n nas-packages/{network/services/*,multimedia/*} ./; rm -rf nas-packages
