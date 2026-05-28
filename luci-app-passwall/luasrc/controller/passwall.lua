@@ -59,6 +59,7 @@ function index()
 	entry({"admin", "services", appname, "server_user"}, cbi(appname .. "/server/user")).leaf = true
 
 	--[[ API ]]
+	entry({"admin", "services", appname, "server_user_update"}, call("server_user_update")).leaf = true
 	entry({"admin", "services", appname, "server_user_status"}, call("server_user_status")).leaf = true
 	entry({"admin", "services", appname, "server_user_log"}, call("server_user_log")).leaf = true
 	entry({"admin", "services", appname, "server_get_log"}, call("server_get_log")).leaf = true
@@ -730,6 +731,23 @@ function rollback_rules()
 	http_write_json_ok()
 end
 
+function server_user_update()
+	local id = http.formvalue("id") -- Node id
+	local data = http.formvalue("data") -- json new Data
+	if id and data then
+		local data_t = jsonParse(data) or {}
+		if next(data_t) then
+			for k, v in pairs(data_t) do
+				uci:set(appname .. "_server", id, k, v)
+			end
+			api.uci_save(uci, appname .. "_server")
+			http_write_json_ok()
+			return
+		end
+	end
+	http_write_json_error()
+end
+
 function server_user_status()
 	local e = {}
 	e.index = http.formvalue("index")
@@ -852,6 +870,7 @@ function restore_backup()
 		fp:write(decoded)
 		fp:close()
 		if chunk_index + 1 == total_chunks then
+			uci:revert(appname)
 			luci.sys.call("echo '' > /tmp/log/passwall.log")
 			api.log(" * PassWall 配置文件上传成功…")
 			local temp_dir = '/tmp/passwall_bak'
