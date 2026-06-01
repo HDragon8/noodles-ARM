@@ -1,5 +1,12 @@
 <%
 local empty = ""
+local date_content = ""
+local f = io.open("/etc/date112", "r")
+if f then
+    date_content = f:read("*l")
+    f:close()
+end
+date_content = date_content:gsub("%s+", "")
 %>
 
 <% if luci.sys.exec("uci -q get base_config.@status[0].links 2>/dev/null | tr -d '\\n'") ~= "0" then %>
@@ -40,44 +47,19 @@ function toLunar(date) {
     function monthDays(y,m) { return lunarInfo[y-1900]&(0x10000>>m)?30:29; }
 }
 
-// 2026年节气公历日期表
-const termDate = [
-    [1, 5],    // 0 小寒
-    [1, 20],   // 1 大寒
-    [2, 4],    // 2 立春
-    [2, 18],   // 3 雨水
-    [3, 5],    // 4 惊蛰
-    [3, 20],   // 5 春分
-    [4, 5],    // 6 清明
-    [4, 20],   // 7 谷雨
-    [5, 5],    // 8 立夏
-    [5, 21],   // 9 小满
-    [6, 5],    // 10 芒种
-    [6, 21],   // 11 夏至
-    [7, 7],    // 12 小暑
-    [7, 23],   // 13 大暑
-    [8, 7],    // 14 立秋
-    [8, 23],   // 15 处暑
-    [9, 7],    // 16 白露
-    [9, 23],   // 17 秋分
-    [10, 8],   // 18 寒露
-    [10, 23],  // 19 霜降
-    [11, 7],   // 20 立冬
-    [11, 22],  // 21 小雪
-    [12, 7],   // 22 大雪
-    [12, 22]   // 23 冬至
-];
-
-// 公历判断节气区间
+// 节气计算（自动适配年份）
 function getTermIndex(date) {
-    let m = date.getMonth() + 1;
-    let d = date.getDate();
-    for (let i = termDate.length - 1; i >= 0; i--) {
-        let tm = termDate[i][0];
-        let td = termDate[i][1];
-        if (m > tm || (m === tm && d >= td)) {
-            return i;
-        }
+    const Y = date.getFullYear();
+    const sTermInfo = [0,21208,42467,63836,85269,107014,128867,150926,173143,195551,218071,240698,263343,285924,308570,331061,353326,375495,397324,419059,440602,462011,483290,504444];
+    const solarTerms = [];
+    for(let i=0;i<24;i++){
+        let sTermDate = new Date((31556925974.7*(Y-1900) + sTermInfo[i]*60000)+Date.UTC(1900,0,6,2,5));
+        solarTerms.push([sTermDate.getUTCMonth()+1, sTermDate.getUTCDate()]);
+    }
+    let m = date.getMonth()+1, d = date.getDate();
+    for(let i=solarTerms.length-1;i>=0;i--){
+        let tm = solarTerms[i][0], td = solarTerms[i][1];
+        if(m>tm || (m===tm && d>=td)) return i;
     }
     return 23;
 }
@@ -95,21 +77,27 @@ const emojiList = ['🎉','🎊','✨','🌟','💥','🎈','🎐','🏮','🎏'
 const r1 = emojiList[Math.floor(Math.random()*emojiList.length)];
 const r2 = emojiList[Math.floor(Math.random()*emojiList.length)];
 
+// ==========================================
+// 关键：时间从 /etc/date112 文件读取
+// ==========================================
+const now = new Date("<%= date_content %>");
+
+const lunar = toLunar(now);
+const termIdx = getTermIndex(now);
+const ganzhi = getGanZhi(now);
+
+const y = now.getFullYear();
+const m = String(now.getMonth()+1).padStart(2,'0');
+const d = String(now.getDate()).padStart(2,'0');
+const solarText = `${y}.${m}.${d}`;
+
+const lunarText = lunar ? `${MonthNames[lunar.month-1]}${DayNames[lunar.day-1]}` : "日期错误";
+const termText = `${EmojiPre[termIdx]}${SolarTerm[termIdx]}${EmojiSuf[termIdx]}`;
+
+const full = `${ganzhi} ${lunarText} ${r1}${solarText}${r2} ${termText}`;
+
 // 页面渲染
 setTimeout(function(){
-    const now = new Date();
-    const lunar = toLunar(now);
-    const termIdx = getTermIndex(now);
-    const ganzhi = getGanZhi(now);
-
-    const y = now.getFullYear();
-    const m = String(now.getMonth()+1).padStart(2,'0');
-    const d = String(now.getDate()).padStart(2,'0');
-    const solarText = `${y}.${m}.${d}`;
-
-    const lunarText = lunar ? `${MonthNames[lunar.month-1]}${DayNames[lunar.day-1]}` : "日期错误";
-    const termText = `${EmojiPre[termIdx]}${SolarTerm[termIdx]}${EmojiSuf[termIdx]}`;
-
     const links = document.createElement('div');
     links.innerHTML = `
         <div class="table">
@@ -119,7 +107,7 @@ setTimeout(function(){
                 </div>
                 <div class="td left">
                     <a href="https://github.com/HDragon8/openwrt" target="_blank" style="color:orangered;font-weight:bold;">
-                        侯永华 @ ${ganzhi} ${lunarText} ${r1}${solarText}${r2} ${termText}
+                        侯永华 @ ${full}
                     </a>
                 </div>
             </div>
