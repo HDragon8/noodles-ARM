@@ -16,7 +16,7 @@ function mvdir() {
 mv -n `find $1/* -maxdepth 0 -type d` ./
 rm -rf $1
 }
-git clone --depth 1 https://github.com/Hdragon112/A-default-settings
+git clone --depth 1 -b OP25 https://github.com/Hdragon112/A-default-settings
 # git clone --depth 1 https://github.com/kiddin9/luci-theme-edge
 git clone --depth 1 https://github.com/Openwrt-Passwall/openwrt-passwall-packages && mvdir openwrt-passwall-packages
 git clone --depth 1 https://github.com/fw876/helloworld && mvdir helloworld
